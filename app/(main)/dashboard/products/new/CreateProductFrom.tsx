@@ -1,7 +1,8 @@
 "use client";
 import { useState, useRef } from "react";
 import { useProducts } from "@/app/hooks/useProduct";
-import { FiUpload, FiX, FiPlus } from "react-icons/fi";
+import { FiUpload, FiX } from "react-icons/fi";
+import { AxiosError } from "axios";
 
 const CATEGORY_OPTIONS = [
   { value: "laptop", label: "Laptop" },
@@ -229,9 +230,14 @@ const CreateProductForm = () => {
       alert("Product created successfully!");
     } catch (error) {
       console.error("Error creating product:", error);
-      alert(
-        (error as any).response?.data?.message || "Failed to create product"
-      );
+
+      if (error instanceof AxiosError) {
+        alert(error.response?.data?.message || "Failed to create product");
+      } else if (error instanceof Error) {
+        alert(error.message);
+      } else {
+        alert("Failed to create product");
+      }
     } finally {
       setIsSubmitting(false);
     }
