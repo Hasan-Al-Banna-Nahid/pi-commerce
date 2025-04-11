@@ -60,14 +60,14 @@ export default function ProductsPage() {
     }
   }, [isAuthenticated, currentPage, searchTerm]);
 
-  const handleDelete = async (id: string) => {
-    try {
-      await api.delete(`/api/products/${id}`);
-      setProducts(products.filter((product) => product._id !== id));
-    } catch (error) {
-      console.error("Failed to delete product:", error);
-    }
-  };
+  // const handleDelete = async (id: string) => {
+  //   try {
+  //     await api.delete(`/api/products/${id}`);
+  //     setProducts(products.filter((product) => product._id !== id));
+  //   } catch (error) {
+  //     console.error("Failed to delete product:", error);
+  //   }
+  // };
 
   if (isLoading || !isAuthenticated) {
     return <div>Loading...</div>;
