@@ -86,7 +86,10 @@ export function Navbar() {
                 >
                   <Avatar className="h-8 w-8 border border-yellow-300">
                     {user?.avatar ? (
-                      <AvatarImage src={user.avatar} alt={user.name} />
+                      <AvatarImage
+                        src={String(user.avatar)}
+                        alt={String(user.name)}
+                      />
                     ) : null}
                     <AvatarFallback className="bg-yellow-100 text-yellow-800">
                       {user ? (
