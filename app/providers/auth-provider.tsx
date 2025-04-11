@@ -9,7 +9,6 @@ import {
 } from "react";
 import {
   getToken,
-  getUserRole,
   setToken,
   removeToken,
   setUser as setUserToStorage,

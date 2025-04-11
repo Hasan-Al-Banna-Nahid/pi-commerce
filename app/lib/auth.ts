@@ -17,7 +17,7 @@ export const removeToken = () => {
   }
 };
 
-export const setUser = (user: any) => {
+export const setUser = (user: object) => {
   if (typeof window !== "undefined") {
     localStorage.setItem("user", JSON.stringify(user));
   }

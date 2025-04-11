@@ -34,6 +34,10 @@ type Pagination = {
   pages: number;
 };
 
+function isAxiosError(error: unknown): error is { response?: { data?: any } } {
+  return typeof error === "object" && error !== null && "response" in error;
+}
+
 export const useProducts = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -51,6 +55,7 @@ export const useProducts = () => {
       const response = await api.get("/api/products", {
         params: { page, limit, ...filters },
       });
+
       setProducts(response.data.products);
       setPagination({
         page: response.data.pagination?.page || page,
@@ -61,14 +66,17 @@ export const useProducts = () => {
             (response.data.pagination?.limit || limit)
         ),
       });
-    } catch (err) {
-      setError(
-        (err as any).response?.data?.message || "Failed to fetch products"
-      );
+    } catch (err: unknown) {
+      if (isAxiosError(err)) {
+        setError(err.response?.data?.message || "Failed to fetch products");
+      } else {
+        setError("Failed to fetch products");
+      }
     } finally {
       setLoading(false);
     }
   };
+
   const createProduct = async (formData: FormData) => {
     try {
       setLoading(true);
@@ -78,17 +86,14 @@ export const useProducts = () => {
         },
       });
       return response.data.product;
-    } catch (err) {
-      const error = err as any;
-      const errorMessage =
-        error.response?.data?.message ||
-        error.response?.data?.errors ||
-        "Failed to create product";
-      throw new Error(
-        typeof errorMessage === "string"
-          ? errorMessage
-          : JSON.stringify(errorMessage)
-      );
+    } catch (err: unknown) {
+      let errorMessage = "Failed to create product";
+      if (isAxiosError(err)) {
+        errorMessage =
+          err.response?.data?.message ||
+          JSON.stringify(err.response?.data?.errors || errorMessage);
+      }
+      throw new Error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -103,14 +108,12 @@ export const useProducts = () => {
       setLoading(true);
       const formData = new FormData();
 
-      // Append product data
       Object.entries(productData).forEach(([key, value]) => {
         if (value !== undefined) {
           formData.append(key, value.toString());
         }
       });
 
-      // Append images
       images.forEach((image) => {
         formData.append("images", image);
       });
@@ -121,8 +124,13 @@ export const useProducts = () => {
         },
       });
       return response.data.product;
-    } catch (err) {
-      throw (err as any).response?.data?.message || "Failed to update product";
+    } catch (err: unknown) {
+      if (isAxiosError(err)) {
+        throw new Error(
+          err.response?.data?.message || "Failed to update product"
+        );
+      }
+      throw new Error("Failed to update product");
     } finally {
       setLoading(false);
     }
@@ -132,9 +140,14 @@ export const useProducts = () => {
     try {
       setLoading(true);
       await api.delete(`/api/products/${id}`);
-      setProducts(products.filter((product) => product._id !== id));
-    } catch (err) {
-      throw (err as any).response?.data?.message || "Failed to delete product";
+      setProducts((prev) => prev.filter((product) => product._id !== id));
+    } catch (err: unknown) {
+      if (isAxiosError(err)) {
+        throw new Error(
+          err.response?.data?.message || "Failed to delete product"
+        );
+      }
+      throw new Error("Failed to delete product");
     } finally {
       setLoading(false);
     }
