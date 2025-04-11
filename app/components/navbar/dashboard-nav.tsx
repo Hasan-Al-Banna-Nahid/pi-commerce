@@ -99,9 +99,9 @@ export function DashboardNav() {
             <DropdownMenuTrigger asChild>
               <Button variant="outline" className="w-full justify-start gap-2">
                 <Avatar className="h-6 w-6">
-                  <AvatarImage src={user?.avatar} />
+                  <AvatarImage src={user?.avatar as string | undefined} />
                   <AvatarFallback>
-                    {user?.name?.charAt(0).toUpperCase()}
+                    {user?.name?.charAt(0)?.toUpperCase() || "U"}
                   </AvatarFallback>
                 </Avatar>
                 <span className="truncate">{user?.name}</span>
