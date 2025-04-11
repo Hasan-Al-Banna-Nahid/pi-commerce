@@ -4,16 +4,9 @@ import { useState } from "react";
 import { useProducts } from "@/app/hooks/useProduct";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Table,
-  TableBody,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Table, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import Link from "next/link";
-import ProductItem from "./ProductItem";
 import {
   Pagination,
   PaginationContent,
@@ -23,8 +16,7 @@ import {
 } from "@/components/ui/pagination";
 
 export default function ProductList() {
-  const { products, loading, error, pagination, fetchProducts, deleteProduct } =
-    useProducts();
+  const { products, loading, error, pagination, fetchProducts } = useProducts();
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
 

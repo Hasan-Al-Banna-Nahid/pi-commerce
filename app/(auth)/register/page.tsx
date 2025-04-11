@@ -56,9 +56,13 @@ export default function RegisterPage() {
       await registerUser(values);
       toast.success("Check Your Email To Verify");
       router.push("/");
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage =
+        (error as { response?: { data?: { message?: string } } })?.response
+          ?.data?.message || "Registration failed";
+
       form.setError("root", {
-        message: error.response?.data?.message || "Registration failed",
+        message: errorMessage,
       });
     }
   };

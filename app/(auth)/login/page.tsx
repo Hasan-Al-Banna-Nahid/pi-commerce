@@ -40,6 +40,7 @@ export default function LoginPage() {
       await login(values.email, values.password);
       router.push("/dashboard");
     } catch (error) {
+      console.error("Login failed:", error);
       form.setError("root", {
         message: "Invalid email or password",
       });

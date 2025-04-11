@@ -7,6 +7,7 @@ import {
   useEffect,
   useState,
 } from "react";
+import { AxiosError } from "axios";
 import {
   getToken,
   setToken,
@@ -21,15 +22,17 @@ type User = {
   id: string;
   email: string;
   name: string;
-  role: string;
-  [key: string]: any;
+  role: "customer" | "vendor" | "retailer" | "wholesaler";
+  [key: string]: unknown;
 };
 
 type RegisterData = {
   name: string;
   email: string;
   password: string;
-  [key: string]: any;
+  role: User["role"];
+  businessName?: string;
+  phone: string;
 };
 
 type AuthContextType = {
@@ -43,17 +46,6 @@ type AuthContextType = {
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-function isAxiosError(error: unknown): error is {
-  response?: {
-    data?: any;
-    status?: number;
-    headers?: any;
-  };
-  message?: string;
-} {
-  return typeof error === "object" && error !== null && "response" in error;
-}
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -119,18 +111,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       } else {
         throw new Error(res.data.message || "Authentication failed");
       }
-    } catch (error: unknown) {
-      if (isAxiosError(error)) {
-        console.error("Login error details:", {
-          error: error.response?.data || error.message,
-          status: error.response?.status,
-          headers: error.response?.headers,
-        });
-        throw new Error(
-          error.response?.data?.message || "Login failed. Please try again."
-        );
-      }
-      throw new Error("Login failed. Please try again.");
+    } catch (error) {
+      const axiosError = error as AxiosError<{ message?: string }>;
+      throw new Error(
+        axiosError.response?.data?.message || "Login failed. Please try again."
+      );
     }
   };
 
@@ -149,15 +134,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setUserToStorage(res.data.user);
       setIsAuthenticated(true);
       setRole(res.data.user.role);
-    } catch (error: unknown) {
-      if (isAxiosError(error)) {
-        console.error(
-          "Registration failed:",
-          error.response?.data || error.message
-        );
-        throw new Error(error.response?.data?.message || "Registration failed");
-      }
-      throw new Error("Registration failed");
+    } catch (error) {
+      const axiosError = error as AxiosError<{ message?: string }>;
+      throw new Error(
+        axiosError.response?.data?.message || "Registration failed"
+      );
     }
   };
 
@@ -189,7 +170,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
 export const useAuth = (): AuthContextType => {
   const context = useContext(AuthContext);
-  if (context === undefined) {
+  if (!context) {
     throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;

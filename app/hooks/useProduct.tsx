@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import api from "@/app/lib/axios";
-import axios, { AxiosError } from "axios";
+import axios from "axios";
 
 type Product = {
   _id: string;
