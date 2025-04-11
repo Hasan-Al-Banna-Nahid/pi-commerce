@@ -4,7 +4,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 import { Category } from "@/app/types/product";
-import { Carousel } from "react-responsive-carousel";
 import "react-responsive-carousel/lib/styles/carousel.min.css"; // import carousel styles
 
 const categories: Category[] = [
@@ -49,27 +48,6 @@ export function CategorySection() {
       </div>
 
       {/* Logo Carousel */}
-      {/* <div className="mb-12">
-        <Carousel
-          infiniteLoop
-          autoPlay
-          interval={3000}
-          showThumbs={false}
-          showStatus={false}
-          dynamicHeight={false}
-          useKeyboardArrows
-        >
-          {categories.map((category) => (
-            <div key={category.id} className="flex justify-center items-center">
-              <img
-                src={category.image}
-                alt={category.name}
-                className="w-full h-2/3 object-cover rounded-lg shadow-lg transform transition-transform duration-500 hover:scale-110"
-              />
-            </div>
-          ))}
-        </Carousel>
-      </div> */}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
         {categories.map((category) => (

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import api from "@/app/lib/axios";
+import axios, { AxiosError } from "axios";
 
 type Product = {
   _id: string;
@@ -34,9 +35,20 @@ type Pagination = {
   pages: number;
 };
 
-function isAxiosError(error: unknown): error is { response?: { data?: any } } {
-  return typeof error === "object" && error !== null && "response" in error;
-}
+type FetchFilters = Record<string, string | number | boolean | undefined>;
+
+type ProductResponse = {
+  product: Product;
+};
+
+type ProductListResponse = {
+  products: Product[];
+  pagination?: {
+    page: number;
+    limit: number;
+    total: number;
+  };
+};
 
 export const useProducts = () => {
   const [products, setProducts] = useState<Product[]>([]);
@@ -49,25 +61,31 @@ export const useProducts = () => {
     pages: 1,
   });
 
-  const fetchProducts = async (page = 1, limit = 10, filters = {}) => {
+  const fetchProducts = async (
+    page: number = 1,
+    limit: number = 10,
+    filters: FetchFilters = {}
+  ) => {
     try {
       setLoading(true);
-      const response = await api.get("/api/products", {
+      const response = await api.get<ProductListResponse>("/api/products", {
         params: { page, limit, ...filters },
       });
 
-      setProducts(response.data.products);
+      const { products, pagination: resPagination } = response.data;
+
+      const total = resPagination?.total ?? products.length;
+      const resLimit = resPagination?.limit ?? limit;
+
+      setProducts(products);
       setPagination({
-        page: response.data.pagination?.page || page,
-        limit: response.data.pagination?.limit || limit,
-        total: response.data.pagination?.total || response.data.products.length,
-        pages: Math.ceil(
-          (response.data.pagination?.total || response.data.products.length) /
-            (response.data.pagination?.limit || limit)
-        ),
+        page: resPagination?.page ?? page,
+        limit: resLimit,
+        total,
+        pages: Math.ceil(total / resLimit),
       });
-    } catch (err: unknown) {
-      if (isAxiosError(err)) {
+    } catch (err) {
+      if (axios.isAxiosError(err)) {
         setError(err.response?.data?.message || "Failed to fetch products");
       } else {
         setError("Failed to fetch products");
@@ -77,23 +95,27 @@ export const useProducts = () => {
     }
   };
 
-  const createProduct = async (formData: FormData) => {
+  const createProduct = async (formData: FormData): Promise<Product> => {
     try {
       setLoading(true);
-      const response = await api.post("/api/products", formData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
-      });
+      const response = await api.post<ProductResponse>(
+        "/api/products",
+        formData,
+        {
+          headers: { "Content-Type": "multipart/form-data" },
+        }
+      );
       return response.data.product;
-    } catch (err: unknown) {
-      let errorMessage = "Failed to create product";
-      if (isAxiosError(err)) {
-        errorMessage =
+    } catch (err) {
+      if (axios.isAxiosError(err)) {
+        const msg =
           err.response?.data?.message ||
-          JSON.stringify(err.response?.data?.errors || errorMessage);
+          JSON.stringify(
+            err.response?.data?.errors || "Failed to create product"
+          );
+        throw new Error(msg);
       }
-      throw new Error(errorMessage);
+      throw new Error("Failed to create product");
     } finally {
       setLoading(false);
     }
@@ -103,7 +125,7 @@ export const useProducts = () => {
     id: string,
     productData: Partial<ProductFormData>,
     images: File[] = []
-  ) => {
+  ): Promise<Product> => {
     try {
       setLoading(true);
       const formData = new FormData();
@@ -118,14 +140,17 @@ export const useProducts = () => {
         formData.append("images", image);
       });
 
-      const response = await api.put(`/api/products/${id}`, formData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
-      });
+      const response = await api.put<ProductResponse>(
+        `/api/products/${id}`,
+        formData,
+        {
+          headers: { "Content-Type": "multipart/form-data" },
+        }
+      );
+
       return response.data.product;
-    } catch (err: unknown) {
-      if (isAxiosError(err)) {
+    } catch (err) {
+      if (axios.isAxiosError(err)) {
         throw new Error(
           err.response?.data?.message || "Failed to update product"
         );
@@ -141,8 +166,8 @@ export const useProducts = () => {
       setLoading(true);
       await api.delete(`/api/products/${id}`);
       setProducts((prev) => prev.filter((product) => product._id !== id));
-    } catch (err: unknown) {
-      if (isAxiosError(err)) {
+    } catch (err) {
+      if (axios.isAxiosError(err)) {
         throw new Error(
           err.response?.data?.message || "Failed to delete product"
         );

@@ -2,17 +2,9 @@
 
 import { useAuth } from "@/app/providers/auth-provider";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
-import {
-  Activity,
-  CreditCard,
-  DollarSign,
-  Package,
-  ShoppingCart,
-  Users,
-} from "lucide-react";
+import { DollarSign, Package, ShoppingCart, Users } from "lucide-react";
 
 export default function DashboardPage() {
   const { user, isAuthenticated, isLoading } = useAuth();

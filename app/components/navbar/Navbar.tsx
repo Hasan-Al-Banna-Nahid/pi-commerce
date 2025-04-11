@@ -16,12 +16,11 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { ShoppingCart, Menu, Search, X, User } from "lucide-react";
 import { useAuth } from "@/app/providers/auth-provider";
-import { Skeleton } from "@/components/ui/skeleton";
 import Image from "next/image";
 
 export function Navbar() {
   const pathname = usePathname();
-  const { user, isAuthenticated, isLoading, role, logout } = useAuth();
+  const { user, isAuthenticated, role, logout } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // Gradient color effect
@@ -275,9 +274,9 @@ export function Navbar() {
           {[
             { name: "All Products", path: "/products" },
             { name: "Today's Deals", path: "/deals" },
-            { name: "Electronics", path: "/categories/electronics" },
-            { name: "Fashion", path: "/categories/fashion" },
-            { name: "Home & Kitchen", path: "/categories/home" },
+            { name: "Laptops", path: "/categories/electronics" },
+            { name: "Mobiles", path: "/categories/fashion" },
+            { name: "Accessories", path: "/categories/home" },
           ].map((item) => (
             <Link
               key={item.path}

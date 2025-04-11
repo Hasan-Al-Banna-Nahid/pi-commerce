@@ -7,7 +7,6 @@ import { Input } from "@/components/ui/input";
 import {
   Table,
   TableBody,
-  TableCell,
   TableHead,
   TableHeader,
   TableRow,
@@ -81,15 +80,15 @@ export default function ProductList() {
                 <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
-            <TableBody>
+            {/* <TableBody>
               {products.map((product) => (
                 <ProductItem
                   key={product._id}
-                  product={product}
+                  // product={product}
                   onDelete={deleteProduct}
                 />
               ))}
-            </TableBody>
+            </TableBody> */}
           </Table>
 
           {pagination.pages > 1 && (

@@ -25,17 +25,35 @@ type User = {
   [key: string]: any;
 };
 
+type RegisterData = {
+  name: string;
+  email: string;
+  password: string;
+  [key: string]: any;
+};
+
 type AuthContextType = {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   role: string | null;
   login: (email: string, password: string) => Promise<void>;
-  register: (userData: any) => Promise<void>;
+  register: (userData: RegisterData) => Promise<void>;
   logout: () => void;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+function isAxiosError(error: unknown): error is {
+  response?: {
+    data?: any;
+    status?: number;
+    headers?: any;
+  };
+  message?: string;
+} {
+  return typeof error === "object" && error !== null && "response" in error;
+}
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -52,7 +70,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       if (!token && !storedUser) {
         setIsLoading(false);
-        return logout(); // No token or fallback user
+        return logout();
       }
 
       if (storedUser) {
@@ -70,7 +88,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setIsAuthenticated(true);
           setRole(userData.role);
         } catch (err) {
-          console.warn("Failed to refresh user from API");
+          console.warn("Failed to refresh user from API", err);
           if (!storedUser) logout();
         }
       }
@@ -83,18 +101,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const login = async (email: string, password: string) => {
     try {
-      console.log("Attempting login with:", { email, password });
-
       const res = await api.post(
         "/api/auth/login",
         { email, password },
         { withCredentials: true }
       );
-      console.log("Login response:", res.data);
 
-      // Check for both possible success indicators
       if (res.data.success && res.data.user) {
-        // If token exists in response, use it
         if (res.data.token) {
           setToken(res.data.token);
         }
@@ -103,25 +116,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setUserToStorage(res.data.user);
         setIsAuthenticated(true);
         setRole(res.data.user.role);
-        return res.data;
       } else {
         throw new Error(res.data.message || "Authentication failed");
       }
-    } catch (error: any) {
-      console.error("Login error details:", {
-        error: error.response?.data || error.message,
-        status: error.response?.status,
-        headers: error.response?.headers,
-      });
-      throw error;
+    } catch (error: unknown) {
+      if (isAxiosError(error)) {
+        console.error("Login error details:", {
+          error: error.response?.data || error.message,
+          status: error.response?.status,
+          headers: error.response?.headers,
+        });
+        throw new Error(
+          error.response?.data?.message || "Login failed. Please try again."
+        );
+      }
+      throw new Error("Login failed. Please try again.");
     }
   };
 
-  const register = async (userData: any) => {
+  const register = async (userData: RegisterData) => {
     try {
       const res = await api.post("/api/auth/register", userData, {
         withCredentials: true,
       });
+
       if (!res.data.token) {
         throw new Error("No token received");
       }
@@ -131,9 +149,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setUserToStorage(res.data.user);
       setIsAuthenticated(true);
       setRole(res.data.user.role);
-    } catch (error) {
-      console.error("Registration failed:", error);
-      throw error;
+    } catch (error: unknown) {
+      if (isAxiosError(error)) {
+        console.error(
+          "Registration failed:",
+          error.response?.data || error.message
+        );
+        throw new Error(error.response?.data?.message || "Registration failed");
+      }
+      throw new Error("Registration failed");
     }
   };
 
@@ -143,7 +167,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setUser(null);
     setIsAuthenticated(false);
     setRole(null);
-    // Optional: Call logout API if needed
     api.post("/api/auth/logout").catch(() => {});
   };
 
@@ -164,7 +187,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   );
 };
 
-export const useAuth = () => {
+export const useAuth = (): AuthContextType => {
   const context = useContext(AuthContext);
   if (context === undefined) {
     throw new Error("useAuth must be used within an AuthProvider");

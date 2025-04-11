@@ -2,10 +2,8 @@
 
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
-import { Input } from "@/components/ui/input";
-import { Search, Check, Shield, Truck } from "lucide-react";
+import { Check, Shield, Truck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { useState } from "react";
 
 interface HeroProps {
   title: string;
@@ -25,18 +23,9 @@ export function Hero({
   ctaLink,
   secondaryText,
   secondaryLink,
-  showSearch = true,
   showTrustBadges = true,
 }: HeroProps) {
   const router = useRouter();
-  const [searchQuery, setSearchQuery] = useState("");
-
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (searchQuery.trim()) {
-      router.push(`/search?q=${encodeURIComponent(searchQuery)}`);
-    }
-  };
 
   return (
     <section className="bg-gradient-to-r   from-indigo-800 via-blue-600 to-slate-600 text-white py-16 px-4 sm:px-6 lg:px-8">
@@ -51,26 +40,6 @@ export function Hero({
           </p>
 
           {/* Search Bar (Amazon-style) */}
-          {/* {showSearch && (
-            <form onSubmit={handleSearch} className="max-w-2xl mx-auto mb-10">
-              <div className="relative">
-                <Input
-                  type="search"
-                  placeholder="Search for products..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-4 pr-12 py-6 text-lg rounded-lg border-none focus-visible:ring-2 focus-visible:ring-blue-400"
-                />
-                <Button
-                  type="submit"
-                  size="icon"
-                  className="absolute right-2 top-1/2 -translate-y-1/2 h-10 w-10 bg-blue-500 hover:bg-blue-600"
-                >
-                  <Search className="h-5 w-5" />
-                </Button>
-              </div>
-            </form>
-          )} */}
 
           {/* Call to Action Buttons */}
           <div className="flex flex-col sm:flex-row justify-center gap-4 mb-12">
