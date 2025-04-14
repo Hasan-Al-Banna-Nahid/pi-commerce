@@ -11,6 +11,8 @@ const eslintConfig = [
     rules: {
       "react/no-unescaped-entities": "off",
       "@next/next/no-page-custom-font": "off",
+      "@typescript-eslint/ban-types": "off", // disables banning custom types like PageProps
+      "@typescript-eslint/explicit-module-boundary-types": "off", // disables needing return type
     },
   }),
 ];
