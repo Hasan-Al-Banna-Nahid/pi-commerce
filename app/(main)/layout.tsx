@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { DashboardNav } from "@/app/components/navbar/dashboard-nav";
-import { AuthProvider } from "../providers/auth-provider";
+import { AuthProvider } from "@/app/providers/auth-provider";
 
 export const metadata: Metadata = {
   title: "Pi-Commerce Dashboard",
@@ -16,9 +16,7 @@ export default function DashboardLayout({
     <div className="flex min-h-screen w-full">
       <AuthProvider>
         <DashboardNav />
-        <div className="flex flex-col flex-1">
-          <main className="flex-1 p-4 sm:p-6">{children}</main>
-        </div>
+        <div className="flex flex-col flex-1">{children}</div>
       </AuthProvider>
     </div>
   );
