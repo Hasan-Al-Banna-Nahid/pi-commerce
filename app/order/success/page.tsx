@@ -8,18 +8,20 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
-// This is the correct type for Next.js App Router dynamic pages
-export default function OrderSuccessPage() {
+export default function OrderSuccessPage({
+  params,
+}: {
+  params: { id: string };
+}) {
   const [hasShownToast, setHasShownToast] = useState(false);
   const { clearCart } = useCart();
-
   useEffect(() => {
     if (!hasShownToast) {
       clearCart();
       toast.success("Order placed successfully!");
       setHasShownToast(true);
     }
-  }, [hasShownToast, clearCart]);
+  }, [hasShownToast]);
 
   return (
     <div>
@@ -27,8 +29,7 @@ export default function OrderSuccessPage() {
       <div className="max-w-2xl mx-auto py-16 px-4 text-center">
         <CheckCircle2 className="h-16 w-16 text-green-500 mx-auto mb-6" />
         <h1 className="text-3xl font-bold mb-4">
-          Order Confirmed!
-          {/* #{params.id} */}
+          Order #{params.id} Confirmed!
         </h1>
         <p className="text-lg text-muted-foreground mb-8">
           Thank you for your purchase. Your order has been received and is being
