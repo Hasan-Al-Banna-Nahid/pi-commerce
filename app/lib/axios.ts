@@ -26,24 +26,43 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
-    // Only handle 401 errors and avoid infinite loops
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    // Only handle 401 errors
+    if (error.response?.status === 401) {
+      // Skip if this is a retry attempt or logout request
+      if (
+        originalRequest._retry ||
+        originalRequest.url?.includes("/auth/logout")
+      ) {
+        return Promise.reject(error);
+      }
+
+      // Skip if we're already on login page
+      if (
+        typeof window !== "undefined" &&
+        window.location.pathname === "/login"
+      ) {
+        return Promise.reject(error);
+      }
+
+      // Mark this request to prevent infinite loops
       originalRequest._retry = true;
 
-      // Try once more with the current token
       try {
-        return await api(originalRequest);
-      } catch (retryError) {
-        // If still failing, logout
-        removeToken();
-        removeUser();
-        if (
-          typeof window !== "undefined" &&
-          window.location.pathname !== "/login"
-        ) {
-          window.location.href = "/login";
+        // Attempt to re-authenticate with current token
+        const token = getToken();
+        if (token) {
+          originalRequest.headers.Authorization = `Bearer ${token}`;
+          return api(originalRequest);
         }
-        return Promise.reject(retryError);
+      } catch (retryError) {
+        console.error("Retry failed:", retryError);
+      }
+
+      // Final cleanup if retry failed
+      removeToken();
+      removeUser();
+      if (typeof window !== "undefined") {
+        window.location.href = "/login?session_expired=true";
       }
     }
     return Promise.reject(error);

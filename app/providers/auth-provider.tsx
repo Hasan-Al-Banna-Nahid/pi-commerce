@@ -63,26 +63,39 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           return;
         }
 
+        // Verify token with backend
         const res = await api.get("/api/auth/me", {
           withCredentials: true,
           headers: {
             Authorization: `Bearer ${token}`,
           },
+          // _retry: true, // Removed as it is not a valid AxiosRequestConfig property
         });
 
+        // Update auth state
         setUser(res.data.user);
         setUserToStorage(res.data.user);
         setIsAuthenticated(true);
         setRole(res.data.user.role);
       } catch (err) {
         console.error("Auth check failed:", err);
-        // Don't automatically logout on initial check failure
+        // Don't logout here - let the interceptor handle it
       } finally {
         setIsLoading(false);
       }
     };
 
     checkAuth();
+
+    // Add visibility change handler to check auth when tab becomes active
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        checkAuth();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () =>
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
   }, []);
 
   const login = async (email: string, password: string) => {

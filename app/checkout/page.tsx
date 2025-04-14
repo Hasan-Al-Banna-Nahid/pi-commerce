@@ -21,6 +21,7 @@ import { loadStripe } from "@stripe/stripe-js";
 import api from "@/app/lib/axios";
 import { Checkbox } from "@/components/ui/checkbox";
 import { StripePaymentForm } from "@/app/components/stripe-payment-form";
+import { getToken } from "../lib/auth";
 
 const stripePromise = loadStripe(
   process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || ""
@@ -78,13 +79,27 @@ export default function CheckoutPage() {
 
   const handleStripeSuccess = async (orderId: string) => {
     try {
-      // await api.get(`/api/orders/verify/${orderId}`);
-      toast.success("Payment successful! Your order has been placed.");
-      clearCart();
-      router.push(`/order/success/${orderId}`);
+      // Verify payment with backend
+      const verification = await api.get(`/api/orders/verify/${orderId}`, {
+        withCredentials: true,
+        headers: {
+          Authorization: `Bearer ${getToken()}`,
+        },
+      });
+
+      if (verification.data.success) {
+        toast.success("Payment successful! Your order has been placed.");
+        clearCart();
+        router.push(`/order/success/${orderId}`);
+      } else {
+        throw new Error("Order verification failed");
+      }
     } catch (error) {
       console.error("Order verification failed:", error);
-      toast.error("Order verification failed");
+      toast.error(
+        "Order verification failed. Please check your order history."
+      );
+      router.push("/orders");
     }
   };
 
