@@ -55,46 +55,40 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     const checkAuth = async () => {
-      setIsLoading(true);
-      try {
-        const token = getToken();
-        if (!token) {
-          setIsLoading(false);
-          return;
-        }
+      if (typeof window === "undefined") return;
 
-        // Verify token with backend
-        const res = await api.get("/api/auth/me", {
-          withCredentials: true,
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
+      const token = getToken();
+      const storedUser = getUserFromStorage();
 
-        // Update auth state
-        setUser(res.data.user);
-        setUserToStorage(res.data.user);
-        setIsAuthenticated(true);
-        setRole(res.data.user.role);
-      } catch (err) {
-        console.error("Auth check failed:", err);
-        // Don't logout here - let the interceptor handle it
-      } finally {
+      if (!token && !storedUser) {
         setIsLoading(false);
+        return logout();
       }
+
+      if (storedUser) {
+        setUser(storedUser);
+        setIsAuthenticated(true);
+        setRole(storedUser.role);
+      }
+
+      if (token) {
+        try {
+          const res = await api.get("/api/auth/me", { withCredentials: true });
+          const userData = res.data.user;
+          setUser(userData);
+          setUserToStorage(userData);
+          setIsAuthenticated(true);
+          setRole(userData.role);
+        } catch (err) {
+          console.warn("Failed to refresh user from API", err);
+          if (!storedUser) logout();
+        }
+      }
+
+      setIsLoading(false);
     };
 
     checkAuth();
-
-    // Add visibility change handler to check auth when tab becomes active
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        checkAuth();
-      }
-    };
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    return () =>
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
   }, []);
 
   const login = async (email: string, password: string) => {
