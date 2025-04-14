@@ -10,16 +10,15 @@ import api from "@/app/lib/axios";
 import { Product } from "@/app/types/product";
 import { Skeleton } from "@/components/ui/skeleton";
 
-type PageProps<T> = {
-  params: T;
-};
-
 export default function ProductDetailPage({
   params,
-}: PageProps<{ id: string }>) {
+}: {
+  params: { id: string };
+}) {
   const { id } = params;
   const router = useRouter();
   const { addToCart } = useCart();
+
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -40,17 +39,21 @@ export default function ProductDetailPage({
 
   if (loading) {
     return (
-      <div className="max-w-2xl mx-auto py-16">
-        <Skeleton className="h-72 w-full" />
-        <Skeleton className="h-6 w-48 mt-4" />
-        <Skeleton className="h-4 w-32 mt-2" />
-        <Skeleton className="h-12 w-32 mt-4" />
+      <div className="max-w-2xl mx-auto py-16 px-4">
+        <Skeleton className="h-72 w-full mb-4" />
+        <Skeleton className="h-8 w-48 mb-2" />
+        <Skeleton className="h-6 w-32 mb-2" />
+        <Skeleton className="h-12 w-40" />
       </div>
     );
   }
 
   if (!product) {
-    return <div>Product not found</div>;
+    return (
+      <div className="max-w-2xl mx-auto py-16 px-4 text-center text-red-500">
+        Product not found
+      </div>
+    );
   }
 
   const handleAddToCart = () => {
@@ -75,16 +78,18 @@ export default function ProductDetailPage({
             <img
               src={product.images[0]}
               alt={product.name}
-              className="w-full h-72 object-cover"
+              className="w-full h-72 object-cover rounded-lg"
             />
           </div>
-          <p className="text-lg">{formatCurrency(product.price)}</p>
+          <p className="text-lg font-semibold">
+            {formatCurrency(product.price)}
+          </p>
           {product.discount > 0 && (
             <p className="text-sm text-red-500">{product.discount}% OFF</p>
           )}
-          <p className="mt-4">{product.description}</p>
+          <p className="mt-4 text-muted-foreground">{product.description}</p>
         </CardContent>
-        <Button className="mt-4" onClick={handleAddToCart}>
+        <Button className="m-4" onClick={handleAddToCart}>
           Add to Cart
         </Button>
       </Card>
