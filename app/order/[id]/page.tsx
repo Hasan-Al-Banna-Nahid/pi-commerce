@@ -1,4 +1,4 @@
-"use client";
+("use client");
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -44,12 +44,12 @@ type Order = {
   transactionId?: string;
 };
 
-interface PageProps {
+interface Props {
   params: { id: string };
   searchParams?: { [key: string]: string | string[] | undefined };
 }
 
-export default function OrderDetailsPage({ params }: PageProps) {
+export default function OrderDetailsPage({ params }: Props) {
   const { isAuthenticated } = useAuth();
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
