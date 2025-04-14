@@ -55,27 +55,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     const checkAuth = async () => {
-      if (typeof window === "undefined") return;
-
-      const token = getToken();
-      const storedUser = getUserFromStorage();
-
-      if (!token && !storedUser) {
-        setIsLoading(false);
-        return;
-      }
-
-      // If we have a stored user but no token, treat as logged out
-      if (!token) {
-        logout();
-        setIsLoading(false);
-        return;
-      }
-
+      setIsLoading(true);
       try {
+        const token = getToken();
+        if (!token) {
+          setIsLoading(false);
+          return;
+        }
+
         const res = await api.get("/api/auth/me", {
           withCredentials: true,
-          // Removed _retry as it is not a valid AxiosRequestConfig property
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
         });
 
         setUser(res.data.user);
@@ -84,10 +76,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setRole(res.data.user.role);
       } catch (err) {
         console.error("Auth check failed:", err);
-        // Only logout if it's specifically an auth error
-        if ((err as AxiosError).response?.status === 401) {
-          logout();
-        }
+        // Don't automatically logout on initial check failure
       } finally {
         setIsLoading(false);
       }
