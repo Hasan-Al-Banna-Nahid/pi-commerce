@@ -44,11 +44,12 @@ type Order = {
   transactionId?: string;
 };
 
-export default function OrderDetailsPage({
-  params,
-}: {
+interface PageProps {
   params: { id: string };
-}) {
+  searchParams?: { [key: string]: string | string[] | undefined };
+}
+
+export default function OrderDetailsPage({ params }: PageProps) {
   const { isAuthenticated } = useAuth();
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
@@ -61,7 +62,7 @@ export default function OrderDetailsPage({
     const fetchOrder = async () => {
       try {
         setLoading(true);
-        const res = await api.get(`/api/orderss/${params.id}`);
+        const res = await api.get(`/api/orders/${params.id}`);
         setOrder(res.data.order);
       } catch (err) {
         setError("Failed to load order details");
@@ -149,7 +150,7 @@ export default function OrderDetailsPage({
           We couldn't find the order you're looking for
         </p>
         <Button asChild>
-          <Link href="/order">View All Orders</Link>
+          <Link href="/orders">View All Orders</Link>
         </Button>
       </div>
     );
