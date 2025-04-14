@@ -1,25 +1,29 @@
 "use client";
 
 import { Navbar } from "@/app/components/navbar/Navbar";
+import { useCart } from "@/app/providers/shopping-cart";
 import { Button } from "@/components/ui/button";
 import { CheckCircle2, ShoppingBag } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
+// This is the correct type for Next.js App Router dynamic pages
 export default function OrderSuccessPage({
   params,
 }: {
   params: { id: string };
 }) {
   const [hasShownToast, setHasShownToast] = useState(false);
+  const { clearCart } = useCart();
 
   useEffect(() => {
     if (!hasShownToast) {
+      clearCart();
       toast.success("Order placed successfully!");
       setHasShownToast(true);
     }
-  }, [hasShownToast]);
+  }, [hasShownToast, clearCart]);
 
   return (
     <div>
