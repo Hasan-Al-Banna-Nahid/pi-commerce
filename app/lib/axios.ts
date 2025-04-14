@@ -21,20 +21,31 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-let isInitialCheck = true;
-
 api.interceptors.response.use(
-  (response) => {
-    isInitialCheck = false;
-    return response;
-  },
-  (error) => {
-    if (error.response?.status === 401 && !isInitialCheck) {
-      removeToken();
-      removeUser();
-      window.location.href = "/login";
+  (response) => response,
+  async (error) => {
+    const originalRequest = error.config;
+
+    // Only handle 401 errors and avoid infinite loops
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
+
+      // Try once more with the current token
+      try {
+        return await api(originalRequest);
+      } catch (retryError) {
+        // If still failing, logout
+        removeToken();
+        removeUser();
+        if (
+          typeof window !== "undefined" &&
+          window.location.pathname !== "/login"
+        ) {
+          window.location.href = "/login";
+        }
+        return Promise.reject(retryError);
+      }
     }
-    isInitialCheck = false;
     return Promise.reject(error);
   }
 );

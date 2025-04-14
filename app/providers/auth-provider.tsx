@@ -60,36 +60,37 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const token = getToken();
       const storedUser = getUserFromStorage();
 
-      // If neither exists, don't log out immediately — just set loading to false
       if (!token && !storedUser) {
         setIsLoading(false);
         return;
       }
 
-      // If user is already stored, use it to populate context
-      if (storedUser) {
-        setUser(storedUser);
+      // If we have a stored user but no token, treat as logged out
+      if (!token) {
+        logout();
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        const res = await api.get("/api/auth/me", {
+          withCredentials: true,
+          // Removed _retry as it is not a valid AxiosRequestConfig property
+        });
+
+        setUser(res.data.user);
+        setUserToStorage(res.data.user);
         setIsAuthenticated(true);
-        setRole(storedUser.role);
-      }
-
-      // Validate token with server
-      if (token) {
-        try {
-          const res = await api.get("/api/auth/me", { withCredentials: true });
-          const userData = res.data.user;
-          setUser(userData);
-          setUserToStorage(userData);
-          setIsAuthenticated(true);
-          setRole(userData.role);
-        } catch (err) {
-          console.warn("Failed to refresh user from API", err);
-          // Only logout if no user exists in localStorage (meaning it’s not freshly logged in)
-          if (!storedUser) logout();
+        setRole(res.data.user.role);
+      } catch (err) {
+        console.error("Auth check failed:", err);
+        // Only logout if it's specifically an auth error
+        if ((err as AxiosError).response?.status === 401) {
+          logout();
         }
+      } finally {
+        setIsLoading(false);
       }
-
-      setIsLoading(false);
     };
 
     checkAuth();
