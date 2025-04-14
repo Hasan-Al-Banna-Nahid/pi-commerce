@@ -1,4 +1,3 @@
-// app/orders/[id]/page.tsx
 "use client";
 
 import { Button } from "@/components/ui/button";
@@ -12,13 +11,6 @@ import { formatCurrency, formatDate } from "@/app/lib/utils";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import Link from "next/link";
-
-// Define the route params type
-interface OrderDetailsPageProps {
-  params: {
-    id: string;
-  };
-}
 
 type OrderItem = {
   product: string;
@@ -52,7 +44,11 @@ type Order = {
   transactionId?: string;
 };
 
-export default function OrderDetailsPage({ params }: OrderDetailsPageProps) {
+export default function OrderDetailsPage({
+  params,
+}: {
+  params: { id: string };
+}) {
   const { isAuthenticated } = useAuth();
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
