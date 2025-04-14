@@ -69,7 +69,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           headers: {
             Authorization: `Bearer ${token}`,
           },
-          // _retry: true, // Removed as it is not a valid AxiosRequestConfig property
+          // _retry: true, // Mark as retryable
         });
 
         // Update auth state

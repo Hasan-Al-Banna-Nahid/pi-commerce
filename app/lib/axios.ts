@@ -62,7 +62,7 @@ api.interceptors.response.use(
       removeToken();
       removeUser();
       if (typeof window !== "undefined") {
-        window.location.href = "/login?session_expired=true";
+        window.location.href = "/login";
       }
     }
     return Promise.reject(error);
