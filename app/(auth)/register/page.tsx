@@ -54,8 +54,9 @@ export default function RegisterPage() {
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     try {
       await registerUser(values);
+      toast.success("Resgistration Successfull");
       toast.success("Check Your Email To Verify");
-      router.push("/");
+      // router.push("/");
     } catch (error: unknown) {
       const errorMessage =
         (error as { response?: { data?: { message?: string } } })?.response

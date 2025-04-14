@@ -17,11 +17,13 @@ import { Badge } from "@/components/ui/badge";
 import { ShoppingCart, Menu, Search, X, User } from "lucide-react";
 import { useAuth } from "@/app/providers/auth-provider";
 import Image from "next/image";
+import { useCart } from "@/app/providers/shopping-cart";
 
 export function Navbar() {
   const pathname = usePathname();
   const { user, isAuthenticated, role, logout } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const { cartCount } = useCart();
 
   // Gradient color effect
   const navbarGradient =
@@ -122,7 +124,7 @@ export function Navbar() {
                       <Link href="/dashboard">Your Account</Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>
-                      <Link href="/orders">Your Orders</Link>
+                      <Link href="/order">Your Orders</Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>
                       <Link href="/wishlist">Your Wishlist</Link>
@@ -163,10 +165,10 @@ export function Navbar() {
               className="relative hover:bg-yellow-400/20"
               asChild
             >
-              <Link href="/cart">
+              <Link href="/checkout">
                 <ShoppingCart className="h-5 w-5 text-white" />
                 <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 bg-red-600 text-white">
-                  {3} {/* Replace with actual cart count */}
+                  {cartCount}
                 </Badge>
               </Link>
             </Button>

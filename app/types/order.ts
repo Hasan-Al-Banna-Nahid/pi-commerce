@@ -1,46 +1,49 @@
-import { Product } from "./product";
-import { User } from "./user";
+export enum OrderStatus {
+  PENDING = "pending",
+  PROCESSING = "processing",
+  SHIPPED = "shipped",
+  DELIVERED = "delivered",
+  CANCELLED = "cancelled",
+}
 
-export interface Order {
+export enum PaymentStatus {
+  PENDING = "pending",
+  COMPLETED = "completed",
+  FAILED = "failed",
+}
+
+export type OrderItem = {
+  product: string;
+  name: string;
+  price: number;
+  quantity: number;
+  image?: string;
+};
+
+export type Order = {
   _id: string;
-  user: string | User;
+  user?: {
+    _id: string;
+    name: string;
+    email: string;
+  };
   items: OrderItem[];
-  shippingAddress: Address;
-  billingAddress: Address;
+  shippingAddress: {
+    street: string;
+    city: string;
+    state: string;
+    postalCode: string;
+    country: string;
+  };
   paymentMethod: string;
-  paymentStatus: "pending" | "completed" | "failed" | "refunded";
-  transactionId?: string;
-  shippingMethod: string;
+  paymentStatus: PaymentStatus;
+  status: OrderStatus;
+  subtotal: number;
   shippingCost: number;
   taxAmount: number;
-  subtotal: number;
   total: number;
-  status:
-    | "pending"
-    | "processing"
-    | "shipped"
-    | "delivered"
-    | "cancelled"
-    | "returned";
-  notes?: string;
-  vendor?: string | User;
   createdAt: string;
-  updatedAt: string;
+  updatedAt?: string;
   deliveredAt?: string;
-}
-
-interface OrderItem {
-  product: string | Product;
-  quantity: number;
-  price: number;
-  variant?: string;
-}
-
-interface Address {
-  street: string;
-  city: string;
-  state: string;
-  country: string;
-  postalCode: string;
-  phone?: string;
-}
+  transactionId?: string;
+};

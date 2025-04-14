@@ -39,7 +39,7 @@ export default function UsersPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-
+  console.log(users);
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
       router.push("/login");
@@ -53,7 +53,8 @@ export default function UsersPage() {
       try {
         setLoading(true);
         const res = await api.get(`/api/users`);
-        setUsers(res.data.users);
+        console.log(res);
+        setUsers(res.data);
         setTotalPages(res.data.pagination?.next?.page - 1 || 1);
       } catch (error) {
         console.error("Failed to fetch users:", error);

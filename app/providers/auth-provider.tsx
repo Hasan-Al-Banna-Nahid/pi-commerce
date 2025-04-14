@@ -60,17 +60,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const token = getToken();
       const storedUser = getUserFromStorage();
 
+      // If neither exists, don't log out immediately — just set loading to false
       if (!token && !storedUser) {
         setIsLoading(false);
-        return logout();
+        return;
       }
 
+      // If user is already stored, use it to populate context
       if (storedUser) {
         setUser(storedUser);
         setIsAuthenticated(true);
         setRole(storedUser.role);
       }
 
+      // Validate token with server
       if (token) {
         try {
           const res = await api.get("/api/auth/me", { withCredentials: true });
@@ -81,6 +84,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setRole(userData.role);
         } catch (err) {
           console.warn("Failed to refresh user from API", err);
+          // Only logout if no user exists in localStorage (meaning it’s not freshly logged in)
           if (!storedUser) logout();
         }
       }

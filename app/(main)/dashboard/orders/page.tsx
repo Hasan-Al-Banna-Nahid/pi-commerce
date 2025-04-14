@@ -1,7 +1,10 @@
 "use client";
 
-import { useAuth } from "@/app/providers/auth-provider";
+import { useState, useEffect, JSX } from "react";
+import { useRouter } from "next/navigation";
+import api from "@/app/lib/axios";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Table,
   TableBody,
@@ -10,145 +13,271 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import api from "@/app/lib/axios";
-import { Order } from "@/app/types/order";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal } from "lucide-react";
+import { MoreVertical, Search, Plus, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency, formatDate } from "@/app/lib/utils";
+import { toast } from "sonner";
 import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination";
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { OrderStatus, PaymentStatus, type Order } from "@/app/types/order";
 
-export default function OrdersPage() {
-  const { isAuthenticated, isLoading, role } = useAuth();
+type OrderWithUser = Order & {
+  user?: {
+    _id: string;
+    name: string;
+    email: string;
+  };
+};
+
+export default function AdminOrdersPage() {
+  const [orders, setOrders] = useState<OrderWithUser[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [searchTerm, setSearchTerm] = useState<string>("");
+  const [selectedOrder, setSelectedOrder] = useState<OrderWithUser | null>(
+    null
+  );
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState<boolean>(false);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState<boolean>(false);
   const router = useRouter();
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
 
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      router.push("/login");
-    }
-  }, [isAuthenticated, isLoading, router]);
+    fetchOrders();
+  }, []);
 
-  useEffect(() => {
-    const fetchOrders = async () => {
-      try {
-        setLoading(true);
-        const endpoint =
-          role === "vendor" ? "/api/orders/myorders" : "/api/orders";
-        const res = await api.get(`${endpoint}?page=${currentPage}`);
-        setOrders(res.data.orders);
-        setTotalPages(res.data.pagination?.next?.page - 1 || 1);
-      } catch (error) {
-        console.error("Failed to fetch orders:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (isAuthenticated) {
-      fetchOrders();
-    }
-  }, [isAuthenticated, currentPage, role]);
-
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "pending":
-        return <Badge variant="secondary">Pending</Badge>;
-      case "processing":
-        return <Badge variant="default">Processing</Badge>;
-      case "shipped":
-        return <Badge variant="default">Shipped</Badge>;
-      case "delivered":
-        return <Badge variant="secondary">Delivered</Badge>;
-      case "cancelled":
-        return <Badge variant="destructive">Cancelled</Badge>;
-      default:
-        return <Badge variant="outline">{status}</Badge>;
+  const fetchOrders = async (): Promise<void> => {
+    try {
+      setLoading(true);
+      const res = await api.get<{ orders: OrderWithUser[] }>("/api/orders");
+      setOrders(res.data.orders);
+    } catch (error) {
+      toast.error("Failed to fetch orders");
+      console.error("Error fetching orders:", error);
+    } finally {
+      setLoading(false);
     }
   };
 
-  if (isLoading || !isAuthenticated) {
-    return <div>Loading...</div>;
+  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>): void => {
+    setSearchTerm(e.target.value);
+  };
+
+  const filteredOrders = orders.filter((order: OrderWithUser) => {
+    const searchLower = searchTerm.toLowerCase();
+    return (
+      order._id.toLowerCase().includes(searchLower) ||
+      order.user?.name.toLowerCase().includes(searchLower) ||
+      order.status.toLowerCase().includes(searchLower) ||
+      order.paymentStatus.toLowerCase().includes(searchLower)
+    );
+  });
+
+  const updateOrderStatus = async (
+    orderId: string,
+    newStatus: OrderStatus
+  ): Promise<void> => {
+    try {
+      setIsUpdatingStatus(true);
+      await api.put(`/api/orders/${orderId}/status`, { status: newStatus });
+      toast.success(`Order status updated to ${newStatus}`);
+      fetchOrders();
+    } catch (error) {
+      toast.error("Failed to update order status");
+      console.error("Error updating order status:", error);
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  };
+
+  const deleteOrder = async (): Promise<void> => {
+    if (!selectedOrder) return;
+
+    try {
+      await api.delete(`/api/orders/${selectedOrder._id}`);
+      toast.success("Order deleted successfully");
+      fetchOrders();
+      setIsDeleteDialogOpen(false);
+    } catch (error) {
+      toast.error("Failed to delete order");
+      console.error("Error deleting order:", error);
+    }
+  };
+
+  const getStatusBadge = (status: OrderStatus): JSX.Element => {
+    switch (status) {
+      case OrderStatus.PENDING:
+        return <Badge variant="secondary">Pending</Badge>;
+      case OrderStatus.PROCESSING:
+        return <Badge className="bg-blue-500">Processing</Badge>;
+      case OrderStatus.SHIPPED:
+        return <Badge className="bg-purple-500">Shipped</Badge>;
+      case OrderStatus.DELIVERED:
+        return <Badge className="bg-green-500">Delivered</Badge>;
+      case OrderStatus.CANCELLED:
+        return <Badge variant="destructive">Cancelled</Badge>;
+      default:
+        return <Badge variant="outline">Unknown</Badge>;
+    }
+  };
+
+  const getPaymentBadge = (status: PaymentStatus): JSX.Element => {
+    switch (status) {
+      case PaymentStatus.COMPLETED:
+        return <Badge className="bg-green-500">Paid</Badge>;
+      case PaymentStatus.PENDING:
+        return <Badge variant="secondary">Pending</Badge>;
+      case PaymentStatus.FAILED:
+        return <Badge variant="destructive">Failed</Badge>;
+      default:
+        return <Badge variant="outline">Unknown</Badge>;
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Orders</h1>
+    <div className="container mx-auto py-8">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+        <h1 className="text-2xl font-bold">Manage Orders</h1>
+        <div className="flex gap-2 w-full md:w-auto">
+          <div className="relative w-full md:w-64">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search orders..."
+              className="pl-9"
+              value={searchTerm}
+              onChange={handleSearch}
+            />
+          </div>
+          <Button onClick={() => router.push("/admin/orders/new")}>
+            <Plus className="h-4 w-4 mr-2" />
+            New Order
+          </Button>
+        </div>
       </div>
+
       <div className="rounded-md border">
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead>Order ID</TableHead>
-              <TableHead>Date</TableHead>
               <TableHead>Customer</TableHead>
-              <TableHead>Total</TableHead>
+              <TableHead>Date</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead>Payment</TableHead>
+              <TableHead>Total</TableHead>
               <TableHead>Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {loading ? (
-              <TableRow>
-                <TableCell colSpan={6} className="text-center">
-                  Loading...
-                </TableCell>
-              </TableRow>
-            ) : orders.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={6} className="text-center">
-                  No orders found
-                </TableCell>
-              </TableRow>
-            ) : (
-              orders.map((order) => (
+            {filteredOrders.length > 0 ? (
+              filteredOrders.map((order) => (
                 <TableRow key={order._id}>
                   <TableCell className="font-medium">
-                    #{order._id.slice(-6).toUpperCase()}
+                    #{order._id.slice(-8).toUpperCase()}
                   </TableCell>
+                  <TableCell>{order.user?.name || "Guest User"}</TableCell>
                   <TableCell>{formatDate(order.createdAt)}</TableCell>
                   <TableCell>
-                    {typeof order.user === "object" ? order.user.name : "N/A"}
+                    {isUpdatingStatus ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      getStatusBadge(order.status)
+                    )}
                   </TableCell>
+                  <TableCell>{getPaymentBadge(order.paymentStatus)}</TableCell>
                   <TableCell>{formatCurrency(order.total)}</TableCell>
-                  <TableCell>{getStatusBadge(order.status)}</TableCell>
                   <TableCell>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="h-8 w-8 p-0">
-                          <MoreHorizontal className="h-4 w-4" />
+                        <Button variant="ghost" size="icon">
+                          <MoreVertical className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem
-                          onClick={() => router.push(`/orders/${order._id}`)}
+                          onClick={() =>
+                            router.push(`/admin/orders/${order._id}`)
+                          }
                         >
-                          View
+                          View Details
                         </DropdownMenuItem>
-                        {(role === "vendor" || role === "admin") && (
+                        <DropdownMenuItem
+                          onClick={() =>
+                            router.push(`/admin/orders/${order._id}/edit`)
+                          }
+                        >
+                          Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => {
+                            setSelectedOrder(order);
+                            setIsDeleteDialogOpen(true);
+                          }}
+                          className="text-red-600"
+                        >
+                          Delete
+                        </DropdownMenuItem>
+                        {order.status !== OrderStatus.CANCELLED && (
                           <DropdownMenuItem
                             onClick={() =>
-                              router.push(`/orders/${order._id}/status`)
+                              updateOrderStatus(
+                                order._id,
+                                OrderStatus.CANCELLED
+                              )
+                            }
+                            className="text-red-600"
+                          >
+                            Cancel Order
+                          </DropdownMenuItem>
+                        )}
+                        {order.status === OrderStatus.PENDING && (
+                          <DropdownMenuItem
+                            onClick={() =>
+                              updateOrderStatus(
+                                order._id,
+                                OrderStatus.PROCESSING
+                              )
                             }
                           >
-                            Update Status
+                            Mark as Processing
+                          </DropdownMenuItem>
+                        )}
+                        {order.status === OrderStatus.PROCESSING && (
+                          <DropdownMenuItem
+                            onClick={() =>
+                              updateOrderStatus(order._id, OrderStatus.SHIPPED)
+                            }
+                          >
+                            Mark as Shipped
+                          </DropdownMenuItem>
+                        )}
+                        {order.status === OrderStatus.SHIPPED && (
+                          <DropdownMenuItem
+                            onClick={() =>
+                              updateOrderStatus(
+                                order._id,
+                                OrderStatus.DELIVERED
+                              )
+                            }
+                          >
+                            Mark as Delivered
                           </DropdownMenuItem>
                         )}
                       </DropdownMenuContent>
@@ -156,33 +285,41 @@ export default function OrdersPage() {
                   </TableCell>
                 </TableRow>
               ))
+            ) : (
+              <TableRow>
+                <TableCell colSpan={7} className="text-center h-24">
+                  No orders found
+                </TableCell>
+              </TableRow>
             )}
           </TableBody>
         </Table>
       </div>
-      <Pagination>
-        <PaginationContent>
-          <PaginationItem>
-            <PaginationPrevious
-              onClick={() =>
-                setCurrentPage((prev) => (prev > 1 ? prev - 1 : prev))
-              }
-            />
-          </PaginationItem>
-          <PaginationItem>
-            <span>
-              Page {currentPage} of {totalPages}
-            </span>
-          </PaginationItem>
-          <PaginationItem>
-            <PaginationNext
-              onClick={() =>
-                setCurrentPage((prev) => (prev < totalPages ? prev + 1 : prev))
-              }
-            />
-          </PaginationItem>
-        </PaginationContent>
-      </Pagination>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirm Order Deletion</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Are you sure you want to delete order #
+            {selectedOrder?._id.slice(-8).toUpperCase()}? This action cannot be
+            undone.
+          </p>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsDeleteDialogOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={deleteOrder}>
+              Delete Order
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

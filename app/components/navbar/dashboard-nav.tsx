@@ -32,6 +32,12 @@ export function DashboardNav() {
 
   const navLinks = [
     {
+      href: "/",
+      icon: <Home className="h-4 w-4" />,
+      label: "Home",
+      allowedRoles: ["admin", "vendor", "retailer", "wholesaler", "customer"],
+    },
+    {
       href: "/dashboard",
       icon: <Home className="h-4 w-4" />,
       label: "Dashboard",

@@ -2,7 +2,9 @@
 import { useState, useRef } from "react";
 import { useProducts } from "@/app/hooks/useProduct";
 import { FiUpload, FiX } from "react-icons/fi";
-import { AxiosError } from "axios";
+import axios from "axios";
+import { toast } from "sonner";
+import api from "@/app/lib/axios";
 
 const CATEGORY_OPTIONS = [
   { value: "laptop", label: "Laptop" },
@@ -28,7 +30,7 @@ type FormData = {
 };
 
 const CreateProductForm = () => {
-  const { createProduct } = useProducts();
+  const [images, setImages] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState<FormData>({
     name: "",
@@ -38,44 +40,28 @@ const CreateProductForm = () => {
     quantity: 0,
     category: "",
     stock: 0,
-    sku: "",
-    subCategory: "",
-    brand: "",
-    model: "",
   });
-  const [images, setImages] = useState<File[]>([]);
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  type FormErrors = Record<keyof FormData, string | undefined> & {
+
+  type FormErrors = Partial<Record<keyof FormData, string>> & {
     images?: string;
   };
 
-  const [errors, setErrors] = useState<FormErrors>({
-    name: undefined,
-    description: undefined,
-    price: undefined,
-    costPrice: undefined,
-    quantity: undefined,
-    category: undefined,
-    stock: undefined,
-    sku: undefined,
-    subCategory: undefined,
-    brand: undefined,
-    model: undefined,
-    images: undefined,
-  });
+  const [errors, setErrors] = useState<FormErrors>({});
 
   const generateSKU = () => {
     return `SKU-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
   };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      const newImages = Array.from(e.target.files);
-      setImages([...images, ...newImages]);
+    const files = e.target.files;
+    if (files) {
+      const fileArray = Array.from(files);
+      setImages(fileArray);
 
-      const newPreviewUrls = newImages.map((file) => URL.createObjectURL(file));
-      setPreviewUrls([...previewUrls, ...newPreviewUrls]);
+      const previews = fileArray.map((file) => URL.createObjectURL(file));
+      setPreviewUrls(previews);
     }
   };
 
@@ -89,20 +75,7 @@ const CreateProductForm = () => {
   };
 
   const validateForm = (): boolean => {
-    const newErrors: FormErrors = {
-      name: undefined,
-      description: undefined,
-      price: undefined,
-      costPrice: undefined,
-      quantity: undefined,
-      category: undefined,
-      stock: undefined,
-      sku: undefined,
-      subCategory: undefined,
-      brand: undefined,
-      model: undefined,
-      images: undefined,
-    };
+    const newErrors: FormErrors = {};
     let isValid = true;
 
     if (!form.name.trim()) {
@@ -167,36 +140,70 @@ const CreateProductForm = () => {
     e.preventDefault();
 
     if (!validateForm()) {
+      toast.error("Please fix the errors in the form");
       return;
     }
 
     setIsSubmitting(true);
+
     try {
       const formData = new FormData();
 
-      // Append all product data
-      formData.append("name", form.name);
-      formData.append("description", form.description);
-      formData.append("price", form.price.toString());
-      formData.append("costPrice", form.costPrice.toString());
-      formData.append("quantity", form.quantity.toString());
-      formData.append("category", form.category);
-      formData.append("stock", form.stock.toString());
-      formData.append("sku", form.sku || generateSKU());
+      // Append image files
+      if (images.length === 0) {
+        toast.error("Please upload at least one image");
+        return;
+      }
 
-      // Append optional fields if they exist
-      if (form.subCategory) formData.append("subCategory", form.subCategory);
-      if (form.brand) formData.append("brand", form.brand);
-      if (form.model) formData.append("model", form.model);
-
-      // Append images
-      images.forEach((image) => {
-        formData.append("images", image);
+      images.forEach((image, index) => {
+        console.log(`Image ${index} - Is File:`, image instanceof File);
+        if (image instanceof File) {
+          formData.append("images", image); // ✅ APPEND IMAGE
+        } else {
+          console.warn("Skipping invalid image:", image);
+        }
       });
 
-      await createProduct(formData);
+      // Append product fields
+      const productData = {
+        ...form,
+        sku: form.sku || generateSKU(),
+        price: form.price.toString(),
+        costPrice: form.costPrice.toString(),
+        quantity: form.quantity.toString(),
+        stock: form.stock.toString(),
+      };
 
-      // Reset form
+      Object.entries(productData).forEach(([key, value]) => {
+        formData.append(key, value);
+      });
+
+      // ✅ Final debug
+      console.log("🔥 Final FormData:");
+      for (const [key, value] of formData.entries()) {
+        if (value instanceof File) {
+          console.log(`${key}: [FILE] ${value.name}`);
+        } else {
+          console.log(`${key}:`, value);
+        }
+      }
+
+      const response = await api.post("/api/products", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+        timeout: 60000,
+        onUploadProgress: (progressEvent) => {
+          const percent = Math.round(
+            (progressEvent.loaded * 100) / (progressEvent.total || 1)
+          );
+          console.log(`Uploading: ${percent}%`);
+        },
+      });
+
+      toast.success("Product created!");
+      console.log("✅ API Response:", response.data);
+
       setForm({
         name: "",
         description: "",
@@ -212,31 +219,17 @@ const CreateProductForm = () => {
       });
       setImages([]);
       setPreviewUrls([]);
-      setErrors({
-        name: undefined,
-        description: undefined,
-        price: undefined,
-        costPrice: undefined,
-        quantity: undefined,
-        category: undefined,
-        stock: undefined,
-        sku: undefined,
-        subCategory: undefined,
-        brand: undefined,
-        model: undefined,
-        images: undefined,
-      });
-
-      alert("Product created successfully!");
+      if (fileInputRef.current) fileInputRef.current.value = "";
     } catch (error) {
-      console.error("Error creating product:", error);
-
-      if (error instanceof AxiosError) {
-        alert(error.response?.data?.message || "Failed to create product");
-      } else if (error instanceof Error) {
-        alert(error.message);
+      console.error("❌ Submit Error:", error);
+      if (axios.isAxiosError(error)) {
+        const serverMessage = error.response?.data?.message;
+        const validationErrors = error.response?.data?.errors;
+        if (validationErrors)
+          setErrors((prev) => ({ ...prev, ...validationErrors }));
+        toast.error(serverMessage || "Failed to create product");
       } else {
-        alert("Failed to create product");
+        toast.error("Unexpected error occurred");
       }
     } finally {
       setIsSubmitting(false);
@@ -255,17 +248,15 @@ const CreateProductForm = () => {
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Product Name
+                Product Name *
               </label>
               <input
                 name="name"
                 value={form.name}
                 onChange={handleChange}
-                placeholder="Enter product name"
                 className={`w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
                   errors.name ? "border-red-500" : "border-gray-300"
                 }`}
-                required
               />
               {errors.name && (
                 <p className="mt-1 text-sm text-red-600">{errors.name}</p>
@@ -274,18 +265,16 @@ const CreateProductForm = () => {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Description
+                Description *
               </label>
               <textarea
                 name="description"
                 value={form.description}
                 onChange={handleChange}
-                placeholder="Enter product description"
                 rows={4}
                 className={`w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
                   errors.description ? "border-red-500" : "border-gray-300"
                 }`}
-                required
               />
               {errors.description && (
                 <p className="mt-1 text-sm text-red-600">
@@ -296,7 +285,7 @@ const CreateProductForm = () => {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Category
+                Category *
               </label>
               <select
                 name="category"
@@ -305,7 +294,6 @@ const CreateProductForm = () => {
                 className={`w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
                   errors.category ? "border-red-500" : "border-gray-300"
                 }`}
-                required
               >
                 <option value="">Select a category</option>
                 {CATEGORY_OPTIONS.map((option) => (
@@ -321,22 +309,14 @@ const CreateProductForm = () => {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Sub Category (Optional)
+                Sub Category
               </label>
               <input
                 name="subCategory"
-                value={form.subCategory}
+                value={form.subCategory || ""}
                 onChange={handleChange}
-                placeholder="Enter sub category"
-                className={`w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                  errors.subCategory ? "border-red-500" : "border-gray-300"
-                }`}
+                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
-              {errors.subCategory && (
-                <p className="mt-1 text-sm text-red-600">
-                  {errors.subCategory}
-                </p>
-              )}
             </div>
           </div>
 
@@ -345,19 +325,18 @@ const CreateProductForm = () => {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Price ($)
+                  Price ($) *
                 </label>
                 <input
                   name="price"
+                  type="number"
+                  min="0.01"
+                  step="0.01"
                   value={form.price}
                   onChange={handleChange}
-                  type="number"
-                  min="0"
-                  step="0.01"
                   className={`w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
                     errors.price ? "border-red-500" : "border-gray-300"
                   }`}
-                  required
                 />
                 {errors.price && (
                   <p className="mt-1 text-sm text-red-600">{errors.price}</p>
@@ -370,15 +349,14 @@ const CreateProductForm = () => {
                 </label>
                 <input
                   name="costPrice"
-                  value={form.costPrice}
-                  onChange={handleChange}
                   type="number"
                   min="0"
                   step="0.01"
+                  value={form.costPrice}
+                  onChange={handleChange}
                   className={`w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
                     errors.costPrice ? "border-red-500" : "border-gray-300"
                   }`}
-                  required
                 />
                 {errors.costPrice && (
                   <p className="mt-1 text-sm text-red-600">
@@ -391,18 +369,17 @@ const CreateProductForm = () => {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Quantity
+                  Quantity *
                 </label>
                 <input
                   name="quantity"
-                  value={form.quantity}
-                  onChange={handleChange}
                   type="number"
                   min="0"
+                  value={form.quantity}
+                  onChange={handleChange}
                   className={`w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
                     errors.quantity ? "border-red-500" : "border-gray-300"
                   }`}
-                  required
                 />
                 {errors.quantity && (
                   <p className="mt-1 text-sm text-red-600">{errors.quantity}</p>
@@ -411,80 +388,106 @@ const CreateProductForm = () => {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Stock
+                  Stock *
                 </label>
                 <input
                   name="stock"
-                  value={form.stock}
-                  onChange={handleChange}
                   type="number"
                   min="0"
+                  value={form.stock}
+                  onChange={handleChange}
                   className={`w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
                     errors.stock ? "border-red-500" : "border-gray-300"
                   }`}
-                  required
                 />
                 {errors.stock && (
                   <p className="mt-1 text-sm text-red-600">{errors.stock}</p>
                 )}
               </div>
             </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Brand
+              </label>
+              <input
+                name="brand"
+                value={form.brand || ""}
+                onChange={handleChange}
+                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Model
+              </label>
+              <input
+                name="model"
+                value={form.model || ""}
+                onChange={handleChange}
+                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
           </div>
         </div>
 
-        {/* Image Upload */}
+        {/* Image Upload Section */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Product Images
+            Product Images *
           </label>
-          <div className="flex space-x-4">
+          <div className="flex flex-wrap gap-4 mb-4">
             {previewUrls.map((url, index) => (
-              <div key={index} className="relative">
+              <div key={index} className="relative group">
                 <img
                   src={url}
-                  alt="Product Preview"
-                  className="w-24 h-24 object-cover rounded-md"
+                  alt={`Preview ${index}`}
+                  className="w-24 h-24 object-cover rounded-md border"
                 />
                 <button
                   type="button"
                   onClick={() => removeImage(index)}
-                  className="absolute top-0 right-0 text-white bg-red-600 rounded-full p-1"
+                  className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors"
                 >
-                  <FiX />
+                  <FiX size={16} />
                 </button>
               </div>
             ))}
           </div>
-          <div className="mt-2">
+          <div>
             <input
-              ref={fileInputRef}
               type="file"
+              multiple
               accept="image/*"
               onChange={handleImageChange}
-              multiple
-              className="hidden"
+              ref={fileInputRef}
             />
+
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+              className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
             >
-              <FiUpload className="inline-block mr-2" />
+              <FiUpload className="mr-2" />
               Upload Images
             </button>
             {errors.images && (
               <p className="mt-1 text-sm text-red-600">{errors.images}</p>
             )}
+            <p className="mt-1 text-sm text-gray-500">
+              Upload up to 5 images (JPEG, PNG, GIF). Max 5MB each.
+            </p>
           </div>
         </div>
 
-        <div className="flex justify-end">
+        <div className="flex justify-end pt-4">
           <button
             type="submit"
             disabled={isSubmitting}
-            className="px-6 py-3 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:bg-gray-400"
+            className="px-6 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:bg-gray-400 transition-colors"
           >
-            {isSubmitting ? "Submitting..." : "Create Product"}
+            {isSubmitting ? "Creating..." : "Create Product"}
           </button>
         </div>
       </form>

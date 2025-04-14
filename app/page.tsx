@@ -1,7 +1,6 @@
-import { ProductGrid } from "@/app/components/products/product-grid";
+import { ProductGrid } from "@/app/products/product-grid";
 import { Hero } from "@/app/components/hero";
-import { CategorySection } from "@/app/components/products/category-section";
-import { FeaturedProducts } from "@/app/components/products/featured-products";
+import { CategorySection } from "@/app/products/category-section";
 import { Testimonials } from "@/app/components/testimonials";
 import { Newsletter } from "@/app/components/newsletter";
 import { Navbar } from "./components/navbar/Navbar";
@@ -19,7 +18,7 @@ export default function Home() {
         secondaryLink="/about"
       />
       <CategorySection />
-      <FeaturedProducts />
+      {/* <FeaturedProducts /> */}
       <ProductGrid />
       <Testimonials />
       <Newsletter />

@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import api from "@/app/lib/axios";
 import axios from "axios";
+import { set } from "react-hook-form";
 
 type Product = {
   _id: string;
@@ -98,12 +99,15 @@ export const useProducts = () => {
   const createProduct = async (formData: FormData): Promise<Product> => {
     try {
       setLoading(true);
+      setTimeout(() => {
+        setLoading(false);
+      }, 5000); // 5 seconds timeout
       const response = await api.post<ProductResponse>(
         "/api/products",
-        formData,
-        {
-          headers: { "Content-Type": "multipart/form-data" },
-        }
+        formData
+        // {
+        //   headers: { "Content-Type": "multipart/form-data" },
+        // }
       );
       return response.data.product;
     } catch (err) {

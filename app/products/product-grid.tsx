@@ -58,37 +58,43 @@ export function ProductGrid() {
   }
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-      {products.map((product) => (
-        <Card key={product._id} className="hover:shadow-lg transition-shadow">
-          <CardHeader>
-            <h3 className="font-semibold">{product.name}</h3>
-          </CardHeader>
-          <CardContent>
-            <div className="aspect-square bg-muted rounded overflow-hidden">
-              <img
-                src={product.images[0]}
-                alt={product.name}
-                className="w-full h-full object-cover"
-              />
-            </div>
-          </CardContent>
-          <CardFooter className="flex justify-between items-center">
-            <div>
-              <p className="font-bold">{formatCurrency(product.price)}</p>
-              {product.discount > 0 && (
-                <Badge variant="secondary">{product.discount}% OFF</Badge>
-              )}
-            </div>
-            <Button
-              size="sm"
-              onClick={() => router.push(`/products/${product._id}`)}
-            >
-              View
-            </Button>
-          </CardFooter>
-        </Card>
-      ))}
+    <div>
+      <h2 className="text-3xl font-bold text-center mb-6">Featured Products</h2>
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+        {products.map((product) => (
+          <Card key={product._id} className="hover:shadow-lg transition-shadow">
+            <CardHeader>
+              <h3 className="font-semibold">{product.name}</h3>
+            </CardHeader>
+            <CardContent>
+              <div className="aspect-square bg-muted rounded overflow-hidden">
+                <img
+                  src={product.images[0]}
+                  alt={product.name}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            </CardContent>
+            <CardFooter className="flex justify-between items-center">
+              <div>
+                <p className="font-bold">{formatCurrency(product.price)}</p>
+                {product.discount > 0 && (
+                  <Badge variant="secondary">{product.discount}% OFF</Badge>
+                )}
+              </div>
+              <Button
+                size="sm"
+                type="button"
+                variant="outline"
+                className="text-muted-foreground hover:bg-transparent"
+                onClick={() => router.push(`/products/${product._id}`)}
+              >
+                View
+              </Button>
+            </CardFooter>
+          </Card>
+        ))}
+      </div>
     </div>
   );
 }
