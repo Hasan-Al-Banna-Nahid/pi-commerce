@@ -81,7 +81,7 @@ export default function CheckoutPage() {
       // await api.get(`/api/orders/verify/${orderId}`);
       toast.success("Payment successful! Your order has been placed.");
       clearCart();
-      router.push(`/order/success/${orderId}`);
+      router.push(`/order/success`);
     } catch (error) {
       console.error("Order verification failed:", error);
       toast.error("Order verification failed");
