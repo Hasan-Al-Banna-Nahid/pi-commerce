@@ -10,11 +10,13 @@ import api from "@/app/lib/axios";
 import { Product } from "@/app/types/product";
 import { Skeleton } from "@/components/ui/skeleton";
 
+type PageProps<T> = {
+  params: T;
+};
+
 export default function ProductDetailPage({
   params,
-}: {
-  params: { id: string };
-}) {
+}: PageProps<{ id: string }>) {
   const { id } = params;
   const router = useRouter();
   const { addToCart } = useCart();
