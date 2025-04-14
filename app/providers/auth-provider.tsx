@@ -6,7 +6,6 @@ import {
   useContext,
   useEffect,
   useState,
-  useCallback,
 } from "react";
 import { AxiosError } from "axios";
 import {
@@ -19,26 +18,31 @@ import {
 } from "@/app/lib/auth";
 import api from "@/app/lib/axios";
 
-type UserRole = "customer" | "vendor" | "retailer" | "wholesaler" | "admin";
-
 type User = {
   id: string;
   email: string;
   name: string;
-  role: UserRole;
+  role: "customer" | "vendor" | "retailer" | "wholesaler";
   [key: string]: unknown;
+};
+
+type RegisterData = {
+  name: string;
+  email: string;
+  password: string;
+  role: User["role"];
+  businessName?: string;
+  phone: string;
 };
 
 type AuthContextType = {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  role: UserRole | null;
-  getToken: () => string | null;
+  role: string | null;
   login: (email: string, password: string) => Promise<void>;
-  register: (userData: any) => Promise<void>;
-  logout: () => Promise<void>;
-  refreshAuth: () => Promise<void>;
+  register: (userData: RegisterData) => Promise<void>;
+  logout: () => void;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -47,55 +51,51 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [role, setRole] = useState<UserRole | null>(null);
-
-  const validateToken = useCallback(async (token: string): Promise<boolean> => {
-    try {
-      const res = await api.get("/api/auth/validate", {
-        headers: { Authorization: `Bearer ${token}` },
-        _skipAuthCheck: true,
-      });
-      return res.data.valid;
-    } catch (error) {
-      return false;
-    }
-  }, []);
-
-  const refreshAuth = useCallback(async () => {
-    setIsLoading(true);
-    const token = getToken();
-    const storedUser = getUserFromStorage() as User | null;
-
-    if (!token || !storedUser) {
-      setIsAuthenticated(false);
-      setRole(null);
-      setIsLoading(false);
-      return;
-    }
-
-    try {
-      const isValid = await validateToken(token);
-      if (isValid) {
-        setUser(storedUser);
-        setRole(storedUser.role);
-        setIsAuthenticated(true);
-      } else {
-        await logout();
-      }
-    } catch (error) {
-      console.error("Auth validation failed:", error);
-      await logout();
-    } finally {
-      setIsLoading(false);
-    }
-  }, [validateToken]);
+  const [role, setRole] = useState<string | null>(null);
 
   useEffect(() => {
-    refreshAuth();
+    const checkAuth = async () => {
+      setIsLoading(true);
+      try {
+        const token = getToken();
+        if (!token) {
+          setIsLoading(false);
+          return;
+        }
 
-    const interval = setInterval(refreshAuth, 5 * 60 * 1000);
-    return () => clearInterval(interval);
-  }, [refreshAuth]);
+        // Verify token with backend
+        const res = await api.get("/api/auth/me", {
+          withCredentials: true,
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        // Update auth state
+        setUser(res.data.user);
+        setUserToStorage(res.data.user);
+        setIsAuthenticated(true);
+        setRole(res.data.user.role);
+      } catch (err) {
+        console.error("Auth check failed:", err);
+        // Don't logout here - let the interceptor handle it
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    checkAuth();
+
+    // Add visibility change handler to check auth when tab becomes active
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        checkAuth();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () =>
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, []);
 
   const login = async (email: string, password: string) => {
     try {
@@ -105,15 +105,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         { withCredentials: true }
       );
 
-      if (res.data.token && res.data.user) {
-        const userData = res.data.user as User;
-        setToken(res.data.token);
-        setUser(userData);
-        setRole(userData.role);
-        setUserToStorage(userData);
+      if (res.data.success && res.data.user) {
+        if (res.data.token) {
+          setToken(res.data.token);
+        }
+
+        setUser(res.data.user);
+        setUserToStorage(res.data.user);
         setIsAuthenticated(true);
+        setRole(res.data.user.role);
       } else {
-        throw new Error("Authentication failed");
+        throw new Error(res.data.message || "Authentication failed");
       }
     } catch (error) {
       const axiosError = error as AxiosError<{ message?: string }>;
@@ -123,22 +125,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const register = async (userData: any) => {
+  const register = async (userData: RegisterData) => {
     try {
       const res = await api.post("/api/auth/register", userData, {
         withCredentials: true,
       });
 
-      if (res.data.token && res.data.user) {
-        const userData = res.data.user as User;
-        setToken(res.data.token);
-        setUser(userData);
-        setRole(userData.role);
-        setUserToStorage(userData);
-        setIsAuthenticated(true);
-      } else {
-        throw new Error("Registration failed");
+      if (!res.data.token) {
+        throw new Error("No token received");
       }
+
+      setToken(res.data.token);
+      setUser(res.data.user);
+      setUserToStorage(res.data.user);
+      setIsAuthenticated(true);
+      setRole(res.data.user.role);
     } catch (error) {
       const axiosError = error as AxiosError<{ message?: string }>;
       throw new Error(
@@ -147,18 +148,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const logout = async () => {
-    try {
-      await api.post("/api/auth/logout", {}, { _skipAuthCheck: true });
-    } catch (error) {
-      console.error("Logout failed:", error);
-    } finally {
-      removeToken();
-      removeUser();
-      setUser(null);
-      setRole(null);
-      setIsAuthenticated(false);
-    }
+  const logout = () => {
+    removeToken();
+    removeUser();
+    setUser(null);
+    setIsAuthenticated(false);
+    setRole(null);
+    api.post("/api/auth/logout").catch(() => {});
   };
 
   return (
@@ -168,11 +164,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         isAuthenticated,
         isLoading,
         role,
-        getToken,
         login,
         register,
         logout,
-        refreshAuth,
       }}
     >
       {children}
