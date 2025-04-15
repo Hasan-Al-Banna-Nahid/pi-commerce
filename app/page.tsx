@@ -4,11 +4,14 @@ import { CategorySection } from "@/app/products/category-section";
 import { Testimonials } from "@/app/components/testimonials";
 import { Newsletter } from "@/app/components/newsletter";
 import { Navbar } from "./components/navbar/Navbar";
+import AmazonStyleHomepage from "./components/HomePage";
 
 export default function Home() {
   return (
     <main>
       <Navbar />
+
+      <AmazonStyleHomepage />
       <Hero
         title="Premium Digital Devices Solutions"
         description="Discover our high-quality digital Devices equipment and supplies for your business needs"
@@ -17,7 +20,7 @@ export default function Home() {
         secondaryText="Learn More"
         secondaryLink="/about"
       />
-      <CategorySection />
+      {/* <CategorySection /> */}
       {/* <FeaturedProducts /> */}
       <ProductGrid />
       <Testimonials />

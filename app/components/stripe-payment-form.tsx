@@ -4,13 +4,12 @@ import { CardElement, useStripe, useElements } from "@stripe/react-stripe-js";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 interface StripePaymentFormProps {
   processing: boolean;
   setProcessing: (processing: boolean) => void;
-  onSuccess: (paymentIntentId: string) => Promise<void>;
+  onSuccess: (paymentIntentId: string) => void; // Changed to void since we'll handle everything in parent
   formData: {
     name: string;
     email: string;
@@ -23,7 +22,6 @@ interface StripePaymentFormProps {
   };
   total: number;
   clientSecret: string;
-  clearCart: () => void;
 }
 
 export const StripePaymentForm = ({
@@ -33,47 +31,14 @@ export const StripePaymentForm = ({
   formData,
   total,
   clientSecret,
-  clearCart,
 }: StripePaymentFormProps) => {
   const stripe = useStripe();
   const elements = useElements();
-  const router = useRouter();
   const [message, setMessage] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!stripe || !clientSecret) {
-      return;
-    }
-
-    // Check for redirect payment methods
-    const query = new URLSearchParams(window.location.search);
-    if (query.get("payment_intent_client_secret")) {
-      stripe.retrievePaymentIntent(clientSecret).then(({ paymentIntent }) => {
-        switch (paymentIntent?.status) {
-          case "succeeded":
-            setMessage("Payment succeeded!");
-            break;
-          case "processing":
-            setMessage("Your payment is processing.");
-            break;
-          case "requires_payment_method":
-            setMessage("Your payment was not successful, please try again.");
-            break;
-          default:
-            setMessage("Something went wrong.");
-            break;
-        }
-      });
-    }
-  }, [stripe, clientSecret]);
-
   const handleSubmit = async (event: React.FormEvent) => {
-    event.preventDefault();
-
-    if (!stripe || !elements) {
-      // Stripe.js hasn't yet loaded
-      return;
-    }
+    event.preventDefault(); // Prevent default form submission
+    if (!stripe || !elements) return;
 
     setProcessing(true);
     setMessage(null);
@@ -101,17 +66,13 @@ export const StripePaymentForm = ({
       );
 
       if (error) {
-        if (error.type === "card_error" || error.type === "validation_error") {
-          setMessage(error.message || "An unexpected error occurred");
-        } else {
-          setMessage("An unexpected error occurred");
-        }
+        setMessage(error.message || "An unexpected error occurred");
         throw error;
       }
 
-      if (paymentIntent?.status === "succeeded") {
-        await onSuccess(paymentIntent.id);
-      }
+      // if (paymentIntent?.status === "succeeded") {
+      //   onSuccess(paymentIntent.id); // Just notify parent, don't handle redirect here
+      // }
     } catch (error) {
       console.error("Payment error:", error);
       toast.error("Payment failed", {
