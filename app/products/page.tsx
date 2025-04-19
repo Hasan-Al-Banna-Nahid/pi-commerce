@@ -82,7 +82,7 @@ export default function ProductsPage() {
                     </div>
                     <div className="mt-4 flex justify-between items-center">
                       <span className="text-lg font-bold text-purple-600">
-                        ${product.price}
+                        Tk.{product.price}
                       </span>
                       <button
                         onClick={() =>

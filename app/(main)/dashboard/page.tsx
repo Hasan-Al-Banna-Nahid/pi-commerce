@@ -30,7 +30,7 @@ export default function DashboardPage() {
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">$45,231.89</div>
+            <div className="text-2xl font-bold">Tk45,231.89</div>
             <p className="text-xs text-muted-foreground">
               +20.1% from last month
             </p>
@@ -89,7 +89,7 @@ export default function DashboardPage() {
                     olivia.martin@email.com
                   </p>
                 </div>
-                <div className="ml-auto font-medium">$1,999.00</div>
+                <div className="ml-auto font-medium">Tk1,999.00</div>
               </div>
               <div className="flex items-center">
                 <div className="ml-4 space-y-1">
@@ -100,7 +100,7 @@ export default function DashboardPage() {
                     jackson.lee@email.com
                   </p>
                 </div>
-                <div className="ml-auto font-medium">$39.00</div>
+                <div className="ml-auto font-medium">Tk39.00</div>
               </div>
             </div>
           </CardContent>
@@ -118,7 +118,7 @@ export default function DashboardPage() {
                   </p>
                   <p className="text-sm text-muted-foreground">In stock: 5</p>
                 </div>
-                <div className="ml-auto font-medium">$2,499.00</div>
+                <div className="ml-auto font-medium">Tk2,499.00</div>
               </div>
               <div className="flex items-center">
                 <div className="ml-4 space-y-1">
@@ -127,7 +127,7 @@ export default function DashboardPage() {
                   </p>
                   <p className="text-sm text-muted-foreground">In stock: 12</p>
                 </div>
-                <div className="ml-auto font-medium">$199.00</div>
+                <div className="ml-auto font-medium">Tk199.00</div>
               </div>
             </div>
           </CardContent>

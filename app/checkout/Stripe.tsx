@@ -1,56 +1,63 @@
 "use client";
 
-import { CardElement, useStripe, useElements } from "@stripe/react-stripe-js";
+import {
+  CardElement,
+  useStripe,
+  useElements,
+  Elements,
+} from "@stripe/react-stripe-js";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import React, { useState } from "react";
-import { useRouter } from "next/navigation";
+import { loadStripe } from "@stripe/stripe-js";
 
-interface StripePaymentFormProps {
-  processing: boolean;
-  setProcessing: (processing: boolean) => void;
-  onSuccess: (paymentIntentId: string) => void; // Changed to void since we'll handle everything in parent
-  formData: {
-    name: string;
-    email: string;
-    phone: string;
-    street: string;
-    city: string;
-    state: string;
-    postalCode: string;
-    country: string;
-  };
-  total: number;
-  clientSecret: string;
+interface StripeFormData {
+  name: string;
+  email: string;
+  phone: string;
+  street: string;
+  city: string;
+  state: string;
+  postalCode: string;
+  country: string;
 }
 
-export const StripePaymentForm = ({
-  processing,
-  setProcessing,
-  onSuccess,
+interface StripeFormProps {
+  formData: StripeFormData;
+  clientSecret: string;
+  total: number;
+  isProcessing: boolean;
+  setIsProcessing: (value: boolean) => void;
+  onPaymentSuccess: (paymentIntentId: string) => Promise<void>;
+}
+const stripePromise = loadStripe(
+  process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || ""
+);
+export const StripeForm = ({
   formData,
-  total,
   clientSecret,
-}: StripePaymentFormProps) => {
+  total,
+  isProcessing,
+  setIsProcessing,
+  onPaymentSuccess,
+}: StripeFormProps) => {
   const stripe = useStripe();
   const elements = useElements();
-  const [message, setMessage] = useState<string | null>(null);
-  const router = useRouter();
-  const handleSubmit = async (event: React.FormEvent) => {
-    debugger;
-    event.preventDefault();
-    if (!stripe || !elements) return;
 
-    setProcessing(true);
-    setMessage(null);
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const cardElement = elements?.getElement(CardElement);
+
+    if (!stripe || !cardElement) return;
+
+    setIsProcessing(true);
 
     try {
       const { error, paymentIntent } = await stripe.confirmCardPayment(
         clientSecret,
         {
           payment_method: {
-            card: elements.getElement(CardElement)!,
+            card: cardElement,
             billing_details: {
               name: formData.name,
               email: formData.email,
@@ -68,30 +75,25 @@ export const StripePaymentForm = ({
       );
 
       if (error) {
-        setMessage(error.message || "An unexpected error occurred");
         throw error;
       }
 
       if (paymentIntent?.status === "succeeded") {
-        toast.success("Payment successful", {
-          description: "Thank you for your purchase!",
-        });
-        router.push("/order/success"); // Redirect to thank you page
-        onSuccess(paymentIntent.id); // ✅ notify parent of success
+        await onPaymentSuccess(paymentIntent.id);
+        toast.success("Payment successful!");
       }
     } catch (error) {
-      // console.error("Payment error:", error);
       toast.error("Payment failed", {
         description:
           error instanceof Error ? error.message : "Payment processing error",
       });
     } finally {
-      setProcessing(false);
+      setIsProcessing(false);
     }
   };
 
   return (
-    <form className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-4">
       <div className="border rounded-md p-4">
         <CardElement
           options={{
@@ -114,18 +116,12 @@ export const StripePaymentForm = ({
         />
       </div>
 
-      {message && (
-        <div className="text-sm text-red-600 p-2 bg-red-50 rounded-md">
-          {message}
-        </div>
-      )}
-
       <Button
         type="submit"
         className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg"
-        disabled={!stripe || !elements || processing}
+        disabled={isProcessing}
       >
-        {processing ? (
+        {isProcessing ? (
           <>
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             Processing...
@@ -135,5 +131,33 @@ export const StripePaymentForm = ({
         )}
       </Button>
     </form>
+  );
+};
+
+interface StripeProviderProps {
+  clientSecret: string;
+  children: React.ReactNode;
+}
+
+export const StripeProvider = ({
+  clientSecret,
+  children,
+}: StripeProviderProps) => {
+  return (
+    <Elements
+      stripe={stripePromise}
+      options={{
+        clientSecret,
+        appearance: {
+          theme: "night",
+          variables: {
+            colorPrimary: "#6366f1",
+            colorBackground: "#ffffff",
+          },
+        },
+      }}
+    >
+      {children}
+    </Elements>
   );
 };

@@ -31,32 +31,32 @@ const AmazonStyleHomepage = () => {
     {
       id: 1,
       name: "Wireless Headphones",
-      price: "$59.99",
-      originalPrice: "$99.99",
+      price: "Tk59.99",
+      originalPrice: "Tk99.99",
       discount: "40% off",
       image: "/images/deal.webp",
     },
     {
       id: 2,
       name: "Smart Watch",
-      price: "$129.99",
-      originalPrice: "$199.99",
+      price: "Tk129.99",
+      originalPrice: "Tk199.99",
       discount: "35% off",
       image: "/images/deal2.webp",
     },
     {
       id: 3,
       name: "Bluetooth Speaker",
-      price: "$39.99",
-      originalPrice: "$69.99",
+      price: "Tk39.99",
+      originalPrice: "Tk69.99",
       discount: "43% off",
       image: "/images/deal3.jpg",
     },
     {
       id: 4,
       name: "Fitness Tracker",
-      price: "$49.99",
-      originalPrice: "$79.99",
+      price: "Tk49.99",
+      originalPrice: "Tk79.99",
       discount: "38% off",
       image: "/images/deal4.webp",
     },
@@ -76,7 +76,7 @@ const AmazonStyleHomepage = () => {
       <div className="relative h-96 w-full overflow-hidden">
         <div
           className="absolute inset-0 flex transition-transform duration-500 ease-in-out"
-          style={{ transform: `translateX(-${currentSlide * 100}%)` }}
+          style={{ transform: `translateX(-Tk{currentSlide * 100}%)` }}
         >
           {heroImages.map((image, index) => (
             <div
@@ -139,7 +139,7 @@ const AmazonStyleHomepage = () => {
             <button
               key={index}
               onClick={() => setCurrentSlide(index)}
-              className={`h-2 w-2 rounded-full ${
+              className={`h-2 w-2 rounded-full Tk{
                 currentSlide === index ? "bg-amber-500 w-4" : "bg-white/50"
               }`}
             />
@@ -232,7 +232,7 @@ const AmazonStyleHomepage = () => {
           <div className="flex overflow-x-auto pb-4 scrollbar-hide space-x-4">
             {[...deals, ...deals].map((item, index) => (
               <motion.div
-                key={`${item.id}-${index}`}
+                key={`Tk{item.id}-Tk{index}`}
                 whileHover={{ scale: 1.02 }}
                 className="flex-shrink-0 w-56 bg-white rounded-lg shadow-sm overflow-hidden"
               >
@@ -262,7 +262,7 @@ const AmazonStyleHomepage = () => {
                     {[...Array(5)].map((_, i) => (
                       <svg
                         key={i}
-                        className={`w-4 h-4 ${
+                        className={`w-4 h-4 Tk{
                           i < 4 ? "text-amber-400" : "text-gray-300"
                         }`}
                         fill="currentColor"
@@ -279,9 +279,6 @@ const AmazonStyleHomepage = () => {
           </div>
         </div>
       </div>
-
-      {/* Newsletter */}
-      <Newsletter />
     </div>
   );
 };

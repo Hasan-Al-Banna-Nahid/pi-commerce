@@ -62,7 +62,7 @@ export default function ProductsPage() {
 
   // const handleDelete = async (id: string) => {
   //   try {
-  //     await api.delete(`/api/products/${id}`);
+  //     await api.delete(`/api/products/Tk{id}`);
   //     setProducts(products.filter((product) => product._id !== id));
   //   } catch (error) {
   //     console.error("Failed to delete product:", error);
@@ -119,7 +119,7 @@ export default function ProductsPage() {
                 <TableRow key={product._id}>
                   <TableCell className="font-medium">{product.name}</TableCell>
                   <TableCell>{product.category}</TableCell>
-                  <TableCell>${product.price.toFixed(2)}</TableCell>
+                  <TableCell>Tk{product.price.toFixed(2)}</TableCell>
                   <TableCell>{product.quantity}</TableCell>
                   <TableCell>
                     <Badge
@@ -138,7 +138,7 @@ export default function ProductsPage() {
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem
                           onClick={() =>
-                            router.push(`/products/${product._id}`)
+                            router.push(`/products/Tk{product._id}`)
                           }
                         >
                           View
@@ -147,7 +147,7 @@ export default function ProductsPage() {
                           <>
                             <DropdownMenuItem
                               onClick={() =>
-                                router.push(`/products/${product._id}/edit`)
+                                router.push(`/products/Tk{product._id}/edit`)
                               }
                             >
                               Edit

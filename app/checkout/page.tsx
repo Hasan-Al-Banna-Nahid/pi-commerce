@@ -16,24 +16,23 @@ import { useCart } from "@/app/providers/shopping-cart";
 import { Navbar } from "@/app/components/navbar/Navbar";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
-import { Elements } from "@stripe/react-stripe-js";
-import { loadStripe } from "@stripe/stripe-js";
 import api from "@/app/lib/axios";
 import { Checkbox } from "@/components/ui/checkbox";
-import { StripePaymentForm } from "@/app/components/stripe-payment-form";
-
-const stripePromise = loadStripe(
-  process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || ""
-);
+import { StripeForm, StripeProvider } from "@/app/checkout/Stripe";
 
 export default function CheckoutPage() {
-  const { cartItems, cartCount, clearCart, updateQuantity } = useCart();
+  const { cartItems, cartCount, clearCart, updateQuantity, removeFromCart } =
+    useCart();
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState("credit");
   const [codVerified, setCodVerified] = useState(false);
   const [clientSecret, setClientSecret] = useState("");
   const router = useRouter();
+
+  // Minimum order requirement of 5 pieces
+  const MINIMUM_ORDER_QUANTITY = 5;
+  const totalQuantity = cartItems.reduce((sum, item) => sum + item.quantity, 0);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -73,51 +72,16 @@ export default function CheckoutPage() {
     (sum, item) => sum + item.price * item.quantity,
     0
   );
-  const tax = subtotal * 0.05;
-  const total = subtotal + shippingCost + tax;
 
-  // const handleStripeSuccess = async (paymentIntentId: string) => {
-  //   try {
-  //     // Create order with the payment intent ID
-  //     const response = await api.post("/api/orders", {
-  //       items: cartItems,
-  //       shippingAddress: {
-  //         street: formData.street,
-  //         city: formData.city,
-  //         state: formData.state,
-  //         postalCode: formData.postalCode,
-  //         country: formData.country,
-  //         phone: formData.phone,
-  //       },
-  //       billingAddress: formData.billingSameAsShipping
-  //         ? {
-  //             street: formData.street,
-  //             city: formData.city,
-  //             state: formData.state,
-  //             postalCode: formData.postalCode,
-  //             country: formData.country,
-  //             phone: formData.phone,
-  //           }
-  //         : {
-  //             street: formData.billingStreet,
-  //             city: formData.billingCity,
-  //             state: formData.billingState,
-  //             postalCode: formData.billingPostalCode,
-  //             country: formData.billingCountry,
-  //             phone: formData.phone,
-  //           },
-  //       paymentMethod: "stripe",
-  //       paymentIntentId,
-  //       shippingCost,
-  //       shippingMethod: formData.city === "Dhaka" ? "standard" : "express",
-  //       tax,
-  //       total,
-  //     });
-  //   } catch (error) {
-  //     console.error("Order creation failed:", error);
-  //     toast.error("Order creation failed");
-  //   }
-  // };
+  // Tax calculations
+  const customsDuty = 0; // 5% but 0 in example
+  const supplementaryDuty = subtotal * 0.1; // SD 10%
+  const vat = subtotal * 0.15; // VAT 15%
+  const ait = subtotal * 0.05; // AIT 5%
+  const at = subtotal * 0.05; // AT 5%
+
+  const total =
+    subtotal + shippingCost + customsDuty + supplementaryDuty + vat + ait + at;
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -154,6 +118,12 @@ export default function CheckoutPage() {
   };
 
   const validateForm = () => {
+    // Check minimum order quantity
+    if (totalQuantity < MINIMUM_ORDER_QUANTITY) {
+      toast.error(`Minimum order quantity is ${MINIMUM_ORDER_QUANTITY} pieces`);
+      return false;
+    }
+
     const requiredFields = [
       "name",
       "email",
@@ -195,9 +165,94 @@ export default function CheckoutPage() {
     return true;
   };
 
+  const createOrder = async (paymentIntentId?: string) => {
+    const shippingMethod = formData.city === "Dhaka" ? "standard" : "express";
+
+    const shippingAddress = {
+      street: formData.street,
+      city: formData.city,
+      state: formData.state,
+      postalCode: formData.postalCode,
+      country: formData.country,
+      phone: formData.phone,
+    };
+
+    const billingAddress = formData.billingSameAsShipping
+      ? shippingAddress
+      : {
+          street: formData.billingStreet,
+          city: formData.billingCity,
+          state: formData.billingState,
+          postalCode: formData.billingPostalCode,
+          country: formData.billingCountry,
+          phone: formData.phone,
+        };
+
+    const orderData = {
+      items: cartItems,
+      shippingAddress,
+      billingAddress,
+      paymentMethod: paymentMethod === "cod" ? "cash_on_delivery" : "stripe",
+      shippingCost,
+      shippingMethod,
+      tax: vat + ait + at + supplementaryDuty + customsDuty,
+      total,
+      ...(paymentIntentId && { paymentIntentId }),
+    };
+
+    const orderResponse = await api.post("/api/orders", orderData);
+    return orderResponse.data;
+  };
+
+  const handlePaymentIntentCreation = async () => {
+    const shippingAddress = {
+      street: formData.street,
+      city: formData.city,
+      state: formData.state,
+      postalCode: formData.postalCode,
+      country: formData.country,
+      phone: formData.phone,
+    };
+
+    const billingAddress = formData.billingSameAsShipping
+      ? shippingAddress
+      : {
+          street: formData.billingStreet,
+          city: formData.billingCity,
+          state: formData.billingState,
+          postalCode: formData.billingPostalCode,
+          country: formData.billingCountry,
+          phone: formData.phone,
+        };
+
+    const paymentIntentResponse = await api.post(
+      "/api/orders/stripe/create-payment-intent",
+      {
+        items: cartItems.map((item) => ({
+          id: item.id,
+          quantity: item.quantity,
+        })),
+        shippingAddress,
+        billingAddress,
+        shippingCost,
+        total,
+      }
+    );
+
+    if (!paymentIntentResponse.data.clientSecret) {
+      throw new Error("No client secret received");
+    }
+
+    return paymentIntentResponse.data.clientSecret;
+  };
+
+  const handleStripePayment = async () => {
+    const clientSecret = await handlePaymentIntentCreation();
+    setClientSecret(clientSecret);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
     if (!validateForm()) {
       return;
     }
@@ -205,66 +260,15 @@ export default function CheckoutPage() {
     setIsProcessing(true);
 
     try {
-      const shippingMethod = formData.city === "Dhaka" ? "standard" : "express";
-
-      const shippingAddress = {
-        street: formData.street,
-        city: formData.city,
-        state: formData.state,
-        postalCode: formData.postalCode,
-        country: formData.country,
-        phone: formData.phone,
-      };
-
-      const billingAddress = formData.billingSameAsShipping
-        ? shippingAddress
-        : {
-            street: formData.billingStreet,
-            city: formData.billingCity,
-            state: formData.billingState,
-            postalCode: formData.billingPostalCode,
-            country: formData.billingCountry,
-            phone: formData.phone,
-          };
-
       if (paymentMethod === "credit") {
-        // Only create payment intent, don't process payment yet
-        const paymentIntentResponse = await api.post(
-          "/api/orders/stripe/create-payment-intent",
-          {
-            items: cartItems.map((item) => ({
-              id: item.id,
-              quantity: item.quantity,
-            })),
-            shippingAddress,
-            billingAddress,
-            shippingCost,
-            total,
-          }
-        );
-
-        if (!paymentIntentResponse.data.clientSecret) {
-          throw new Error("No client secret received");
-        }
-
-        setClientSecret(paymentIntentResponse.data.clientSecret);
+        await handleStripePayment();
         return;
       }
 
       // Handle COD payment
-      const orderResponse = await api.post("/api/orders", {
-        items: cartItems,
-        shippingAddress,
-        billingAddress,
-        paymentMethod: "cash_on_delivery",
-        shippingCost,
-        shippingMethod,
-        tax,
-        total,
-      });
+      const orderResponse = await createOrder();
 
-      // Common success handling for both payment methods
-      if (orderResponse.data.success) {
+      if (orderResponse.success) {
         clearCart();
         toast.success("Order placed successfully");
         router.push(`/order/success/`);
@@ -281,55 +285,6 @@ export default function CheckoutPage() {
     }
   };
 
-  const handleStripeSuccess = async (paymentIntentId: string) => {
-    try {
-      const shippingMethod = formData.city === "Dhaka" ? "standard" : "express";
-
-      const orderResponse = await api.post("/api/orders", {
-        items: cartItems,
-        shippingAddress: {
-          street: formData.street,
-          city: formData.city,
-          state: formData.state,
-          postalCode: formData.postalCode,
-          country: formData.country,
-          phone: formData.phone,
-        },
-        billingAddress: formData.billingSameAsShipping
-          ? {
-              street: formData.street,
-              city: formData.city,
-              state: formData.state,
-              postalCode: formData.postalCode,
-              country: formData.country,
-              phone: formData.phone,
-            }
-          : {
-              street: formData.billingStreet,
-              city: formData.billingCity,
-              state: formData.billingState,
-              postalCode: formData.billingPostalCode,
-              country: formData.billingCountry,
-              phone: formData.phone,
-            },
-        paymentMethod: "stripe",
-        paymentIntentId,
-        shippingCost,
-        shippingMethod,
-        tax,
-        total,
-      });
-
-      if (orderResponse.data.success) {
-        clearCart();
-        toast.success("Payment successful! Your order has been placed.");
-        router.push(`/order/success/${orderResponse.data.orderId}`);
-      }
-    } catch (error) {
-      console.error("Order creation failed:", error);
-      toast.error("Order creation failed");
-    }
-  };
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -372,6 +327,15 @@ export default function CheckoutPage() {
         >
           Checkout
         </motion.h1>
+
+        {totalQuantity < MINIMUM_ORDER_QUANTITY && (
+          <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <p className="text-yellow-800">
+              Minimum order requirement: {MINIMUM_ORDER_QUANTITY} pieces. You
+              currently have {totalQuantity} pieces in your cart.
+            </p>
+          </div>
+        )}
 
         <div className="grid md:grid-cols-2 gap-8">
           <Card className="border-0 shadow-lg bg-white/90 backdrop-blur-sm">
@@ -562,6 +526,7 @@ export default function CheckoutPage() {
                     onValueChange={(value) => {
                       setPaymentMethod(value);
                       setCodVerified(false);
+                      setClientSecret("");
                     }}
                     className="grid gap-4"
                   >
@@ -592,34 +557,33 @@ export default function CheckoutPage() {
 
                   {paymentMethod === "credit" ? (
                     clientSecret ? (
-                      <Elements
-                        stripe={stripePromise}
-                        options={{
-                          clientSecret,
-                          appearance: {
-                            theme: "stripe",
-                            variables: {
-                              colorPrimary: "#6366f1",
-                              colorBackground: "#ffffff",
-                            },
-                          },
-                        }}
-                      >
-                        <StripePaymentForm
-                          processing={isProcessing}
-                          setProcessing={setIsProcessing}
-                          onSuccess={handleStripeSuccess}
+                      <StripeProvider clientSecret={clientSecret}>
+                        <StripeForm
                           formData={formData}
-                          total={total}
                           clientSecret={clientSecret}
+                          total={total}
+                          isProcessing={isProcessing}
+                          setIsProcessing={setIsProcessing}
+                          onPaymentSuccess={async (paymentIntentId) => {
+                            const orderResponse = await createOrder(
+                              paymentIntentId
+                            );
+                            if (orderResponse.success) {
+                              clearCart();
+                              router.push("/order/success");
+                            }
+                          }}
                         />
-                      </Elements>
+                      </StripeProvider>
                     ) : (
                       <div className="space-y-4 pt-4">
                         <Button
                           type="submit"
                           className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg"
-                          disabled={isProcessing}
+                          disabled={
+                            isProcessing ||
+                            totalQuantity < MINIMUM_ORDER_QUANTITY
+                          }
                         >
                           {isProcessing ? (
                             <>
@@ -660,7 +624,11 @@ export default function CheckoutPage() {
                       <Button
                         type="submit"
                         className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg"
-                        disabled={isProcessing || !codVerified}
+                        disabled={
+                          isProcessing ||
+                          !codVerified ||
+                          totalQuantity < MINIMUM_ORDER_QUANTITY
+                        }
                       >
                         {isProcessing ? (
                           <>
@@ -698,7 +666,15 @@ export default function CheckoutPage() {
                         />
                       </div>
                       <div className="flex-1">
-                        <h4 className="font-medium">{item.name}</h4>
+                        <div className="flex justify-between items-start">
+                          <h4 className="font-medium">{item.name}</h4>
+                          <button
+                            onClick={() => removeFromCart(item.id)}
+                            className="text-red-500 hover:text-red-700 text-sm"
+                          >
+                            Remove
+                          </button>
+                        </div>
                         <p className="text-sm text-muted-foreground">
                           {item.price.toFixed(2)}৳ × {item.quantity}
                         </p>
@@ -751,8 +727,28 @@ export default function CheckoutPage() {
                     <span>{shippingCost.toFixed(2)}৳</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Tax (5%)</span>
-                    <span>{tax.toFixed(2)}৳</span>
+                    <span className="text-muted-foreground">
+                      Customs Duty (5%)
+                    </span>
+                    <span>{customsDuty.toFixed(2)}৳</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">
+                      Supplementary Duty (10%)
+                    </span>
+                    <span>{supplementaryDuty.toFixed(2)}৳</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">VAT (15%)</span>
+                    <span>{vat.toFixed(2)}৳</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">AIT (5%)</span>
+                    <span>{ait.toFixed(2)}৳</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">AT (5%)</span>
+                    <span>{at.toFixed(2)}৳</span>
                   </div>
                   <div className="flex justify-between pt-3 border-t font-medium text-lg">
                     <span>Total</span>

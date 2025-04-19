@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import api from "@/app/lib/axios";
 import axios from "axios";
-import { set } from "react-hook-form";
 
 type Product = {
   _id: string;
