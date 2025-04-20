@@ -29,6 +29,8 @@ interface StripeFormProps {
   isProcessing: boolean;
   setIsProcessing: (value: boolean) => void;
   onPaymentSuccess: (paymentIntentId: string) => Promise<void>;
+  onError: (error: Error) => void;
+  onCreatePaymentIntent: () => Promise<string>;
 }
 const stripePromise = loadStripe(
   process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || ""
@@ -40,6 +42,8 @@ export const StripeForm = ({
   isProcessing,
   setIsProcessing,
   onPaymentSuccess,
+  onError,
+  onCreatePaymentIntent,
 }: StripeFormProps) => {
   const stripe = useStripe();
   const elements = useElements();
@@ -87,13 +91,14 @@ export const StripeForm = ({
         description:
           error instanceof Error ? error.message : "Payment processing error",
       });
+      onError(error as Error);
     } finally {
       setIsProcessing(false);
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <div className="space-y-4">
       <div className="border rounded-md p-4">
         <CardElement
           options={{
@@ -118,6 +123,7 @@ export const StripeForm = ({
 
       <Button
         type="submit"
+        onClick={handleSubmit}
         className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg"
         disabled={isProcessing}
       >
@@ -130,7 +136,7 @@ export const StripeForm = ({
           `Pay ${total.toFixed(2)}৳`
         )}
       </Button>
-    </form>
+    </div>
   );
 };
 

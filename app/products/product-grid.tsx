@@ -69,7 +69,7 @@ export function ProductGrid() {
             <CardContent>
               <div className="aspect-square bg-muted rounded overflow-hidden">
                 <img
-                  src={product.images[0]}
+                  src={product.images[0] || product.images[1]}
                   alt={product.name}
                   className="w-full h-full object-cover"
                 />

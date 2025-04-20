@@ -30,8 +30,18 @@ export default function CheckoutPage() {
   const [clientSecret, setClientSecret] = useState("");
   const router = useRouter();
 
-  // Minimum order requirement of 5 pieces
-  const MINIMUM_ORDER_QUANTITY = 5;
+  // Dynamic minimum order quantity based on price
+  const getMinimumQuantity = (price: number) => {
+    if (price <= 20000) return 5;
+    if (price > 20000 && price <= 80000) return 3;
+    return 1; // for prices > 80000
+  };
+
+  // Check if any item doesn't meet minimum quantity requirement
+  const hasInvalidQuantity = cartItems.some(
+    (item) => item.quantity < getMinimumQuantity(item.price)
+  );
+
   const totalQuantity = cartItems.reduce((sum, item) => sum + item.quantity, 0);
 
   useEffect(() => {
@@ -58,13 +68,13 @@ export default function CheckoutPage() {
     city: "Dhaka",
     state: "",
     postalCode: "",
-    country: "Bangladesh",
+    country: "bd",
     billingSameAsShipping: true,
     billingStreet: "",
     billingCity: "Dhaka",
     billingState: "",
     billingPostalCode: "",
-    billingCountry: "Bangladesh",
+    billingCountry: "bd",
   });
 
   const shippingCost = formData.city === "Dhaka" ? 60 : 100;
@@ -74,7 +84,7 @@ export default function CheckoutPage() {
   );
 
   // Tax calculations
-  const customsDuty = 0; // 5% but 0 in example
+  const customsDuty = subtotal > 80000 ? 0 : subtotal * 0.05; // 5% but 0 for orders > 80k
   const supplementaryDuty = subtotal * 0.1; // SD 10%
   const vat = subtotal * 0.15; // VAT 15%
   const ait = subtotal * 0.05; // AIT 5%
@@ -83,6 +93,33 @@ export default function CheckoutPage() {
   const total =
     subtotal + shippingCost + customsDuty + supplementaryDuty + vat + ait + at;
 
+  const logPaymentError = (error: any, context: string) => {
+    console.error(`[Payment Error] ${context}:`, {
+      timestamp: new Date().toISOString(),
+      error: {
+        message: error.message,
+        stack: error.stack,
+        response: error.response?.data || null,
+      },
+      user: user?.id || "anonymous",
+      cart: {
+        itemCount: cartCount,
+        total,
+        items: cartItems.map((item) => ({
+          id: item.id,
+          quantity: item.quantity,
+          price: item.price,
+        })),
+      },
+      paymentMethod,
+      formData: {
+        // Don't log sensitive data like full addresses
+        city: formData.city,
+        country: formData.country,
+        billingSameAsShipping: formData.billingSameAsShipping,
+      },
+    });
+  };
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
@@ -98,7 +135,7 @@ export default function CheckoutPage() {
     }
   };
 
-  const verifyCod = () => {
+  const verifyCod = async () => {
     if (!formData.phone) {
       toast.error("Phone number is required for COD verification");
       return;
@@ -110,17 +147,65 @@ export default function CheckoutPage() {
     }
 
     setIsProcessing(true);
-    setTimeout(() => {
-      setCodVerified(true);
+    try {
+      // Replace with actual API call to your backend
+      const response = await api.post("/api/payments/verify-cod", {
+        phone: formData.phone,
+      });
+
+      if (response.data.verified) {
+        setCodVerified(true);
+        toast.success("COD verification successful");
+      } else {
+        throw new Error(response.data.message || "COD verification failed");
+      }
+    } catch (error: any) {
+      logPaymentError(error, "COD Verification");
+
+      toast.error("COD verification failed", {
+        description: error.response?.data?.message || error.message,
+      });
+      setCodVerified(false);
+    } finally {
       setIsProcessing(false);
-      toast.success("COD verification successful");
-    }, 1500);
+    }
   };
 
+  const handleCodPayment = async () => {
+    try {
+      const orderResponse = await createOrder();
+
+      if (!orderResponse.success) {
+        throw new Error(orderResponse.message || "Order creation failed");
+      }
+
+      clearCart();
+      toast.success("Order placed successfully");
+      router.push(`/order/success/${orderResponse.orderId}`);
+    } catch (error: any) {
+      logPaymentError(error, "COD Payment Submission");
+
+      toast.error("Order failed", {
+        description:
+          error.response?.data?.message ||
+          "There was an issue processing your order. Please try again.",
+      });
+    }
+  };
   const validateForm = () => {
-    // Check minimum order quantity
-    if (totalQuantity < MINIMUM_ORDER_QUANTITY) {
-      toast.error(`Minimum order quantity is ${MINIMUM_ORDER_QUANTITY} pieces`);
+    // Check minimum order quantity for each item
+    if (hasInvalidQuantity) {
+      const invalidItems = cartItems.filter(
+        (item) => item.quantity < getMinimumQuantity(item.price)
+      );
+
+      invalidItems.forEach((item) => {
+        toast.error(
+          `Minimum order for ${item.name} (${item.price.toFixed(
+            2
+          )}৳) is ${getMinimumQuantity(item.price)} pieces`
+        );
+      });
       return false;
     }
 
@@ -197,6 +282,7 @@ export default function CheckoutPage() {
       shippingMethod,
       tax: vat + ait + at + supplementaryDuty + customsDuty,
       total,
+      currency: "bdt",
       ...(paymentIntentId && { paymentIntentId }),
     };
 
@@ -204,51 +290,72 @@ export default function CheckoutPage() {
     return orderResponse.data;
   };
 
-  const handlePaymentIntentCreation = async () => {
-    const shippingAddress = {
-      street: formData.street,
-      city: formData.city,
-      state: formData.state,
-      postalCode: formData.postalCode,
-      country: formData.country,
-      phone: formData.phone,
-    };
+  const handleStripePayment = async () => {
+    try {
+      const clientSecret = await handlePaymentIntentCreation();
+      setClientSecret(clientSecret);
+    } catch (error: any) {
+      logPaymentError(error, "Stripe Payment Intent Creation");
 
-    const billingAddress = formData.billingSameAsShipping
-      ? shippingAddress
-      : {
-          street: formData.billingStreet,
-          city: formData.billingCity,
-          state: formData.billingState,
-          postalCode: formData.billingPostalCode,
-          country: formData.billingCountry,
-          phone: formData.phone,
-        };
-
-    const paymentIntentResponse = await api.post(
-      "/api/orders/stripe/create-payment-intent",
-      {
-        items: cartItems.map((item) => ({
-          id: item.id,
-          quantity: item.quantity,
-        })),
-        shippingAddress,
-        billingAddress,
-        shippingCost,
-        total,
-      }
-    );
-
-    if (!paymentIntentResponse.data.clientSecret) {
-      throw new Error("No client secret received");
+      toast.error("Payment initialization failed", {
+        description:
+          error.response?.data?.message ||
+          "We couldn't initialize the payment process. Please try again.",
+      });
+      setIsProcessing(false);
     }
-
-    return paymentIntentResponse.data.clientSecret;
   };
 
-  const handleStripePayment = async () => {
-    const clientSecret = await handlePaymentIntentCreation();
-    setClientSecret(clientSecret);
+  const handlePaymentIntentCreation = async () => {
+    try {
+      const paymentIntentResponse = await api.post(
+        "/api/orders/stripe/create-payment-intent",
+        {
+          items: cartItems.map((item) => ({
+            id: item.id,
+            name: item.name, // ✅ add name
+            quantity: item.quantity,
+            price: item.price,
+          })),
+          shippingAddress: {
+            street: formData.street,
+            city: formData.city,
+            state: formData.state,
+            postalCode: formData.postalCode,
+            country: formData.country,
+            phone: formData.phone,
+          },
+          billingAddress: formData.billingSameAsShipping
+            ? undefined
+            : {
+                street: formData.billingStreet,
+                city: formData.billingCity,
+                state: formData.billingState,
+                postalCode: formData.billingPostalCode,
+                country: formData.billingCountry,
+                phone: formData.phone,
+              },
+          shippingCost,
+          subtotal, // ✅ add subtotal
+          taxAmount: vat + ait + at + supplementaryDuty + customsDuty, // ✅ add taxAmount
+          total,
+          currency: "bdt",
+          metadata: {
+            userId: user?.id || "guest",
+            cartId: cartItems.map((item) => item.id).join(","),
+          },
+        }
+      );
+
+      if (!paymentIntentResponse.data.clientSecret) {
+        throw new Error("No client secret received from server");
+      }
+
+      return paymentIntentResponse.data.clientSecret;
+    } catch (error: any) {
+      logPaymentError(error, "Payment Intent Creation");
+      throw error;
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -328,12 +435,23 @@ export default function CheckoutPage() {
           Checkout
         </motion.h1>
 
-        {totalQuantity < MINIMUM_ORDER_QUANTITY && (
+        {hasInvalidQuantity && (
           <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
             <p className="text-yellow-800">
-              Minimum order requirement: {MINIMUM_ORDER_QUANTITY} pieces. You
-              currently have {totalQuantity} pieces in your cart.
+              Some products don't meet the minimum order quantity requirements:
             </p>
+            <ul className="list-disc pl-5 mt-2">
+              {cartItems
+                .filter(
+                  (item) => item.quantity < getMinimumQuantity(item.price)
+                )
+                .map((item) => (
+                  <li key={item.id}>
+                    {item.name}: Minimum {getMinimumQuantity(item.price)} pieces
+                    (currently {item.quantity})
+                  </li>
+                ))}
+            </ul>
           </div>
         )}
 
@@ -557,21 +675,35 @@ export default function CheckoutPage() {
 
                   {paymentMethod === "credit" ? (
                     clientSecret ? (
+                      // Update your StripeForm component usage
                       <StripeProvider clientSecret={clientSecret}>
                         <StripeForm
                           formData={formData}
                           clientSecret={clientSecret}
                           total={total}
+                          onCreatePaymentIntent={handlePaymentIntentCreation}
                           isProcessing={isProcessing}
                           setIsProcessing={setIsProcessing}
                           onPaymentSuccess={async (paymentIntentId) => {
-                            const orderResponse = await createOrder(
-                              paymentIntentId
-                            );
-                            if (orderResponse.success) {
-                              clearCart();
-                              router.push("/order/success");
+                            try {
+                              const orderResponse = await createOrder(
+                                paymentIntentId
+                              );
+                              if (orderResponse.success) {
+                                clearCart();
+                                router.push("/order/success");
+                              }
+                            } catch (error: any) {
+                              toast.error("Order creation failed", {
+                                description: error.message,
+                              });
                             }
+                          }}
+                          onError={(error) => {
+                            toast.error("Payment failed", {
+                              description: error.message,
+                            });
+                            setIsProcessing(false);
                           }}
                         />
                       </StripeProvider>
@@ -579,11 +711,9 @@ export default function CheckoutPage() {
                       <div className="space-y-4 pt-4">
                         <Button
                           type="submit"
+                          onClick={handlePaymentIntentCreation}
                           className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg"
-                          disabled={
-                            isProcessing ||
-                            totalQuantity < MINIMUM_ORDER_QUANTITY
-                          }
+                          disabled={isProcessing || hasInvalidQuantity}
                         >
                           {isProcessing ? (
                             <>
@@ -625,9 +755,7 @@ export default function CheckoutPage() {
                         type="submit"
                         className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg"
                         disabled={
-                          isProcessing ||
-                          !codVerified ||
-                          totalQuantity < MINIMUM_ORDER_QUANTITY
+                          isProcessing || !codVerified || hasInvalidQuantity
                         }
                       >
                         {isProcessing ? (
@@ -726,33 +854,46 @@ export default function CheckoutPage() {
                     </span>
                     <span>{shippingCost.toFixed(2)}৳</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">
-                      Customs Duty (5%)
-                    </span>
-                    <span>{customsDuty.toFixed(2)}৳</span>
-                  </div>
-                  <div className="flex justify-between">
+                  {/* {customsDuty > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">
+                        Customs Duty (5%)
+                      </span>
+                      <span>{customsDuty.toFixed(2)}৳</span>
+                    </div>
+                  )} */}
+                  {/* <div className="flex justify-between">
                     <span className="text-muted-foreground">
                       Supplementary Duty (10%)
                     </span>
                     <span>{supplementaryDuty.toFixed(2)}৳</span>
-                  </div>
-                  <div className="flex justify-between">
+                  </div> */}
+                  {/* <div className="flex justify-between">
                     <span className="text-muted-foreground">VAT (15%)</span>
                     <span>{vat.toFixed(2)}৳</span>
-                  </div>
-                  <div className="flex justify-between">
+                  </div> */}
+                  {/* <div className="flex justify-between">
                     <span className="text-muted-foreground">AIT (5%)</span>
                     <span>{ait.toFixed(2)}৳</span>
-                  </div>
-                  <div className="flex justify-between">
+                  </div> */}
+                  {/* <div className="flex justify-between">
                     <span className="text-muted-foreground">AT (5%)</span>
                     <span>{at.toFixed(2)}৳</span>
-                  </div>
+                  </div> */}
+                  {/* <div className="flex justify-between">
+                    <span className="text-muted-foreground">
+                      Total Vat (40%)৳
+                    </span>
+                     <span>{at.toFixed(2)}৳</span> 
+                  </div> 
+                  */}
+
                   <div className="flex justify-between pt-3 border-t font-medium text-lg">
                     <span>Total</span>
-                    <span>{total.toFixed(2)}৳</span>
+                    <div className="flex flex-col justify-center items-center">
+                      <span>{total.toFixed(2)}৳</span>
+                      <span>+Including vat & Others.</span>
+                    </div>
                   </div>
                 </div>
               </div>

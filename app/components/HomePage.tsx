@@ -76,7 +76,7 @@ const AmazonStyleHomepage = () => {
       <div className="relative h-96 w-full overflow-hidden">
         <div
           className="absolute inset-0 flex transition-transform duration-500 ease-in-out"
-          style={{ transform: `translateX(-Tk{currentSlide * 100}%)` }}
+          style={{ transform: `translateX(-${currentSlide * 100}%)` }}
         >
           {heroImages.map((image, index) => (
             <div
@@ -139,7 +139,7 @@ const AmazonStyleHomepage = () => {
             <button
               key={index}
               onClick={() => setCurrentSlide(index)}
-              className={`h-2 w-2 rounded-full Tk{
+              className={`h-2 w-2 rounded-full ${
                 currentSlide === index ? "bg-amber-500 w-4" : "bg-white/50"
               }`}
             />
@@ -232,7 +232,7 @@ const AmazonStyleHomepage = () => {
           <div className="flex overflow-x-auto pb-4 scrollbar-hide space-x-4">
             {[...deals, ...deals].map((item, index) => (
               <motion.div
-                key={`Tk{item.id}-Tk{index}`}
+                key={`${item.id}-${index}`}
                 whileHover={{ scale: 1.02 }}
                 className="flex-shrink-0 w-56 bg-white rounded-lg shadow-sm overflow-hidden"
               >
@@ -262,7 +262,7 @@ const AmazonStyleHomepage = () => {
                     {[...Array(5)].map((_, i) => (
                       <svg
                         key={i}
-                        className={`w-4 h-4 Tk{
+                        className={`w-4 h-4 ${
                           i < 4 ? "text-amber-400" : "text-gray-300"
                         }`}
                         fill="currentColor"

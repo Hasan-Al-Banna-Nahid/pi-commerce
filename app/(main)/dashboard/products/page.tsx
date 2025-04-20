@@ -25,6 +25,13 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination";
 import Link from "next/link";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { MoreHorizontal } from "lucide-react";
 
 export default function ProductsPage() {
   const { isAuthenticated, isLoading, role } = useAuth();
@@ -60,14 +67,14 @@ export default function ProductsPage() {
     }
   }, [isAuthenticated, currentPage, searchTerm]);
 
-  // const handleDelete = async (id: string) => {
-  //   try {
-  //     await api.delete(`/api/products/Tk{id}`);
-  //     setProducts(products.filter((product) => product._id !== id));
-  //   } catch (error) {
-  //     console.error("Failed to delete product:", error);
-  //   }
-  // };
+  const handleDelete = async (id: string) => {
+    try {
+      await api.delete(`/api/products/${id}`);
+      setProducts(products.filter((product) => product._id !== id));
+    } catch (error) {
+      console.error("Failed to delete product:", error);
+    }
+  };
 
   if (isLoading || !isAuthenticated) {
     return <div>Loading...</div>;
@@ -129,7 +136,7 @@ export default function ProductsPage() {
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    {/* <DropdownMenu>
+                    <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" className="h-8 w-8 p-0">
                           <MoreHorizontal className="h-4 w-4" />
@@ -147,7 +154,9 @@ export default function ProductsPage() {
                           <>
                             <DropdownMenuItem
                               onClick={() =>
-                                router.push(`/products/Tk{product._id}/edit`)
+                                router.push(
+                                  `/dashboard/products/${product._id}`
+                                )
                               }
                             >
                               Edit
@@ -161,7 +170,7 @@ export default function ProductsPage() {
                           </>
                         )}
                       </DropdownMenuContent>
-                    </DropdownMenu> */}
+                    </DropdownMenu>
                   </TableCell>
                 </TableRow>
               ))
