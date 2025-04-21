@@ -161,7 +161,8 @@ export default function ProductsPage() {
   };
 
   return (
-    <div className="bg-gradient-to-br from-purple-800 via-blue-800 to-red-800 min-h-screen">
+    // bg-gradient-to-br from-purple-800 via-blue-800 to-red-800
+    <div className=" min-h-screen">
       <Navbar />
       <div className="relative py-12 px-4 sm:px-6 lg:px-8">
         {/* Category, Subcategory, and Brand Section */}

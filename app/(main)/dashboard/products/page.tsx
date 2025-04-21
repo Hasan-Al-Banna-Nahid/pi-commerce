@@ -62,12 +62,12 @@ export default function ProductsPage() {
         setProducts(fetchedProducts);
         setFilteredProducts(fetchedProducts);
         setTotalPages(Math.ceil(fetchedProducts.length / itemsPerPage));
-        if (fetchedProducts.length < 25) {
-          console.warn(
-            "Expected 25 products, but fetched:",
-            fetchedProducts.length
-          );
-        }
+        // if (fetchedProducts.length < 25) {
+        //   console.warn(
+        //     "Expected 25 products, but fetched:",
+        //     fetchedProducts.length
+        //   );
+        // }
       } catch (error) {
         console.error("Failed to fetch products:", error);
       } finally {
@@ -142,13 +142,13 @@ export default function ProductsPage() {
       />
 
       {/* Debug Info */}
-      <div>
+      {/* <div>
         {products.length < 25 && (
           <p className="text-yellow-600">
             Warning: Only {products.length} products fetched. Expected 25.
           </p>
         )}
-      </div>
+      </div> */}
 
       {/* Products Table */}
       <div className="rounded-md border">

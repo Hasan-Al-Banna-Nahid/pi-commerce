@@ -11,7 +11,6 @@ import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import React, { useState } from "react";
 
-// Initialize Stripe with the publishable key from environment variables
 const stripePromise = loadStripe(
   process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!
 );
@@ -36,7 +35,7 @@ export function StripeForm({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!stripe || !elements) {
-      onError(new Error("Stripe is not initialized"));
+      onError(new Error("Stripe is not initialized. Please try again."));
       return;
     }
 
@@ -68,10 +67,19 @@ export function StripeForm({
       }
     } catch (error: any) {
       onError(error);
-    } finally {
       setIsProcessing(false);
     }
   };
+
+  if (!stripe || !elements) {
+    return (
+      <div className="p-4 bg-red-50 rounded-md">
+        <p className="text-sm text-red-800">
+          Error: Payment form could not be loaded. Please try again later.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -92,10 +100,7 @@ export function StripeForm({
               },
             },
           }}
-          onChange={(event) => {
-            console.log("CardElement Change:", event);
-            onCardChange(event);
-          }}
+          onChange={onCardChange}
         />
       </div>
       <Button

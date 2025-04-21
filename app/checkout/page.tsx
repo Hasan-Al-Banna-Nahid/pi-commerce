@@ -13,6 +13,7 @@ import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import Image from "next/image";
 import { useCart } from "@/app/providers/shopping-cart";
+import { loadStripe } from "@stripe/stripe-js";
 import { Navbar } from "@/app/components/navbar/Navbar";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
@@ -25,6 +26,7 @@ export default function CheckoutPage() {
     useCart();
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isFetchingPaymentIntent, setIsFetchingPaymentIntent] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState("credit");
   const [codVerified, setCodVerified] = useState(false);
   const [clientSecret, setClientSecret] = useState("");
@@ -32,8 +34,15 @@ export default function CheckoutPage() {
     string | null
   >(null);
   const [cardDetailsProvided, setCardDetailsProvided] = useState(false);
-  const [isLoadingPaymentIntent, setIsLoadingPaymentIntent] = useState(false);
   const router = useRouter();
+
+  // Debug logs for authentication and cart state
+  console.log("CheckoutPage State:", {
+    authLoading,
+    isAuthenticated,
+    cartCount,
+    cartItems,
+  });
 
   const getMinimumQuantity = (price: number) => {
     if (price <= 20000) return 5;
@@ -47,6 +56,7 @@ export default function CheckoutPage() {
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
+      console.log("Redirecting to login...");
       router.push("/login");
     }
   }, [isAuthenticated, authLoading, router]);
@@ -71,6 +81,7 @@ export default function CheckoutPage() {
     postalCode: "",
     country: "bd",
     billingSameAsShipping: true,
+    billingName: user?.name || "",
     billingStreet: "",
     billingCity: "Dhaka",
     billingState: "",
@@ -178,6 +189,7 @@ export default function CheckoutPage() {
 
     if (!formData.billingSameAsShipping) {
       const billingFields = [
+        "billingName",
         "billingStreet",
         "billingCity",
         "billingState",
@@ -202,7 +214,12 @@ export default function CheckoutPage() {
       !formData.useSavedCard &&
       !cardDetailsProvided
     ) {
-      toast.error("Please enter valid card details");
+      toast.error("Please enter complete and valid card details");
+      return false;
+    }
+
+    if (paymentMethod === "credit" && !clientSecret && !formData.useSavedCard) {
+      toast.error("Payment initialization failed. Please try again.");
       return false;
     }
 
@@ -210,7 +227,6 @@ export default function CheckoutPage() {
   };
 
   const handlePaymentIntentCreation = async () => {
-    setIsLoadingPaymentIntent(true);
     try {
       const paymentIntentResponse = await api.post(
         "/api/orders/stripe/create-payment-intent",
@@ -222,6 +238,7 @@ export default function CheckoutPage() {
             price: item.price,
           })),
           shippingAddress: {
+            name: formData.name,
             street: formData.street,
             city: formData.city,
             state: formData.state,
@@ -232,6 +249,7 @@ export default function CheckoutPage() {
           billingAddress: formData.billingSameAsShipping
             ? undefined
             : {
+                name: formData.billingName,
                 street: formData.billingStreet,
                 city: formData.billingCity,
                 state: formData.billingState,
@@ -253,19 +271,16 @@ export default function CheckoutPage() {
         throw new Error("No client secret received");
       }
 
-      console.log("Payment Intent Created:", paymentIntentResponse.data);
       return paymentIntentResponse.data;
     } catch (error: any) {
-      console.error("Payment Intent Creation Error:", error);
-      toast.error("Failed to initialize payment", {
+      toast.error("Payment initialization failed", {
         description: error.response?.data?.message || error.message,
       });
       throw error;
-    } finally {
-      setIsLoadingPaymentIntent(false);
     }
   };
 
+  // In handleStripePayment
   const handleStripePayment = async () => {
     try {
       const response = await handlePaymentIntentCreation();
@@ -278,12 +293,8 @@ export default function CheckoutPage() {
 
         if (paymentIntentStatus.data.status === "succeeded") {
           await handlePaymentSuccess(response.paymentIntentId);
-        } else if (paymentIntentStatus.data.status === "requires_action") {
-          toast.info("Additional authentication required for saved card");
-          setClientSecret(response.clientSecret);
         } else {
-          toast.error("Payment intent not confirmed");
-          setIsProcessing(false);
+          throw new Error("Payment intent not confirmed");
         }
       }
     } catch (error: any) {
@@ -294,13 +305,55 @@ export default function CheckoutPage() {
     }
   };
 
+  // In handlePaymentSuccess (called after Stripe payment confirmation)
   const handlePaymentSuccess = async (paymentIntentId: string) => {
     try {
       const orderResponse = await api.post("/api/orders", {
         paymentIntentId,
+        items: cartItems.map((item) => ({
+          id: item.id,
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price,
+          // variant: item.variant || null, // Include variant if supported
+        })),
+        shippingAddress: {
+          name: formData.name,
+          street: formData.street,
+          city: formData.city,
+          state: formData.state,
+          postalCode: formData.postalCode,
+          country: formData.country,
+          phone: formData.phone,
+        },
+        billingAddress: formData.billingSameAsShipping
+          ? {
+              name: formData.name,
+              street: formData.street,
+              city: formData.city,
+              state: formData.state,
+              postalCode: formData.postalCode,
+              country: formData.country,
+              phone: formData.phone,
+            }
+          : {
+              name: formData.billingName,
+              street: formData.billingStreet,
+              city: formData.billingCity,
+              state: formData.billingState,
+              postalCode: formData.billingPostalCode,
+              country: formData.billingCountry,
+              phone: formData.phone,
+            },
+        shippingCost,
+        taxAmount,
+        subtotal,
+        total,
+        paymentMethod: "credit", // Explicitly set
       });
 
       if (orderResponse.data.success) {
+        // await saveUserInfo();
         toast.success("Order placed successfully!", {
           description: "Your order has been confirmed.",
         });
@@ -310,6 +363,7 @@ export default function CheckoutPage() {
         throw new Error(orderResponse.data.message || "Order creation failed");
       }
     } catch (error: any) {
+      console.error("Order creation error (frontend):", error);
       toast.error("Order creation failed", {
         description: error.response?.data?.message || error.message,
       });
@@ -318,6 +372,7 @@ export default function CheckoutPage() {
     }
   };
 
+  // In handleCodPayment
   const handleCodPayment = async () => {
     try {
       const orderResponse = await api.post("/api/orders/cod", {
@@ -326,8 +381,10 @@ export default function CheckoutPage() {
           name: item.name,
           quantity: item.quantity,
           price: item.price,
+          // variant: item.variant || null, // Include variant if supported
         })),
         shippingAddress: {
+          name: formData.name,
           street: formData.street,
           city: formData.city,
           state: formData.state,
@@ -336,8 +393,17 @@ export default function CheckoutPage() {
           phone: formData.phone,
         },
         billingAddress: formData.billingSameAsShipping
-          ? undefined
+          ? {
+              name: formData.name,
+              street: formData.street,
+              city: formData.city,
+              state: formData.state,
+              postalCode: formData.postalCode,
+              country: formData.country,
+              phone: formData.phone,
+            }
           : {
+              name: formData.billingName,
               street: formData.billingStreet,
               city: formData.billingCity,
               state: formData.billingState,
@@ -346,9 +412,14 @@ export default function CheckoutPage() {
               phone: formData.phone,
             },
         shippingCost,
+        taxAmount,
+        subtotal,
+        total,
+        paymentMethod: "cod", // Explicitly include
       });
 
       if (orderResponse.data.success) {
+        // await saveUserInfo();
         toast.success("Order placed successfully!", {
           description: "Your COD order has been confirmed.",
         });
@@ -358,6 +429,7 @@ export default function CheckoutPage() {
         throw new Error(orderResponse.data.message || "COD order failed");
       }
     } catch (error: any) {
+      console.error("COD order creation error (frontend):", error);
       toast.error("COD order failed", {
         description: error.response?.data?.message || error.message,
       });
@@ -368,7 +440,7 @@ export default function CheckoutPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!validateForm() || isProcessing) return;
+    if (!validateForm() || isProcessing || isFetchingPaymentIntent) return;
 
     setIsProcessing(true);
 
@@ -387,32 +459,9 @@ export default function CheckoutPage() {
     }
   };
 
-  // Initialize clientSecret when selecting credit card payment
-  useEffect(() => {
-    if (
-      paymentMethod === "credit" &&
-      !formData.useSavedCard &&
-      isAuthenticated &&
-      cartItems.length > 0
-    ) {
-      handlePaymentIntentCreation()
-        .then((response) => {
-          setClientSecret(response.clientSecret);
-        })
-        .catch((error) => {
-          console.error("Failed to initialize clientSecret:", error);
-        });
-    } else {
-      setClientSecret("");
-      setCardDetailsProvided(false);
-    }
-  }, [paymentMethod, formData.useSavedCard, isAuthenticated, cartItems]);
-
-  // Fetch saved payment methods
   useEffect(() => {
     const fetchSavedPaymentMethods = async () => {
       try {
-        // Mocked for demonstration; replace with actual API call
         setSavedPaymentMethodId("pm_123456789");
       } catch (error) {
         console.error("Failed to fetch saved payment methods:", error);
@@ -424,16 +473,82 @@ export default function CheckoutPage() {
     }
   }, [isAuthenticated]);
 
+  const initializePaymentIntent = async () => {
+    try {
+      setIsFetchingPaymentIntent(true);
+      const timeout = setTimeout(() => {
+        toast.error(
+          "Payment initialization is taking too long. Please try again."
+        );
+        setIsFetchingPaymentIntent(false);
+      }, 10000); // 10-second timeout
+
+      const response = await handlePaymentIntentCreation();
+      clearTimeout(timeout);
+
+      if (!response.clientSecret) {
+        throw new Error("No client secret received from server");
+      }
+      setClientSecret(response.clientSecret);
+    } catch (error: any) {
+      console.error("Failed to initialize payment intent:", error);
+      toast.error("Failed to initialize payment", {
+        description: error.message || "Please try again later",
+      });
+      setClientSecret("");
+      setCardDetailsProvided(false);
+    } finally {
+      setIsFetchingPaymentIntent(false);
+    }
+  };
+
+  useEffect(() => {
+    if (
+      paymentMethod === "credit" &&
+      !formData.useSavedCard &&
+      isAuthenticated &&
+      cartItems.length > 0
+    ) {
+      initializePaymentIntent();
+    } else {
+      setClientSecret("");
+      setCardDetailsProvided(false);
+    }
+  }, [paymentMethod, formData.useSavedCard, isAuthenticated, cartItems]);
+
+  const handleCardDetailsChange = (event: any) => {
+    console.log("Card Details Change:", event);
+    setCardDetailsProvided(event.complete);
+  };
+
+  // Render loading state
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin" />
+        <p className="ml-2">Loading authentication...</p>
       </div>
     );
   }
 
-  if (!isAuthenticated) return null;
+  // Render fallback for unauthenticated users
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold mb-4">Please Log In</h1>
+          <p className="text-muted-foreground mb-6">
+            You need to be logged in to access the checkout page.
+          </p>
+          <Button asChild>
+            <a href="/login">Go to Login</a>
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
+  // Render empty cart state
   if (cartCount === 0) {
     return (
       <div className="max-w-2xl mx-auto py-16 px-4 text-center">
@@ -448,6 +563,7 @@ export default function CheckoutPage() {
     );
   }
 
+  // Main checkout UI
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
       <Navbar />
@@ -616,6 +732,16 @@ export default function CheckoutPage() {
                       <div className="mt-4 space-y-4">
                         <h4 className="font-medium">Billing Address</h4>
                         <div className="space-y-2">
+                          <Label htmlFor="billingName">Full Name *</Label>
+                          <Input
+                            id="billingName"
+                            name="billingName"
+                            value={formData.billingName}
+                            onChange={handleChange}
+                            required
+                          />
+                        </div>
+                        <div className="space-y-2">
                           <Label htmlFor="billingStreet">
                             Street Address *
                           </Label>
@@ -627,7 +753,6 @@ export default function CheckoutPage() {
                             required
                           />
                         </div>
-
                         <div className="grid grid-cols-3 gap-4">
                           <div className="space-y-2">
                             <Label htmlFor="billingCity">City *</Label>
@@ -675,6 +800,7 @@ export default function CheckoutPage() {
                       setPaymentMethod(value);
                       setCodVerified(false);
                       setClientSecret("");
+                      setFormData((prev) => ({ ...prev, useSavedCard: false }));
                       setCardDetailsProvided(false);
                     }}
                     className="grid gap-4"
@@ -716,8 +842,8 @@ export default function CheckoutPage() {
                                 ...formData,
                                 useSavedCard: Boolean(checked),
                               });
-                              setClientSecret("");
                               setCardDetailsProvided(false);
+                              setClientSecret("");
                             }}
                           />
                           <Label htmlFor="useSavedCard">
@@ -727,12 +853,12 @@ export default function CheckoutPage() {
                       )}
 
                       {paymentMethod === "credit" && !formData.useSavedCard ? (
-                        isLoadingPaymentIntent ? (
-                          <div className="flex items-center justify-center p-4">
-                            <Loader2 className="h-6 w-6 animate-spin" />
-                            <span className="ml-2">
-                              Loading payment form...
-                            </span>
+                        isFetchingPaymentIntent ? (
+                          <div className="p-4 bg-gray-100 rounded-md flex items-center justify-center">
+                            <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                            <p className="text-sm text-gray-600">
+                              Initializing payment...
+                            </p>
                           </div>
                         ) : clientSecret ? (
                           <StripeProvider clientSecret={clientSecret}>
@@ -745,21 +871,37 @@ export default function CheckoutPage() {
                                 });
                                 setIsProcessing(false);
                               }}
-                              onCardChange={(event) => {
-                                setCardDetailsProvided(event.complete);
-                              }}
+                              onCardChange={handleCardDetailsChange}
                             />
+                            {!cardDetailsProvided && (
+                              <p className="text-sm text-red-600 mt-2">
+                                Please enter complete card details
+                              </p>
+                            )}
                           </StripeProvider>
                         ) : (
-                          <p className="text-red-500">
-                            Failed to load payment form. Please try again.
-                          </p>
+                          <div className="p-4 bg-red-50 rounded-md flex items-center justify-between">
+                            <p className="text-sm text-red-800">
+                              Failed to load payment form. Please try again.
+                            </p>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={initializePaymentIntent}
+                            >
+                              Retry
+                            </Button>
+                          </div>
                         )
                       ) : (
                         <Button
                           type="submit"
                           className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg"
-                          disabled={isProcessing || hasInvalidQuantity}
+                          disabled={
+                            isProcessing ||
+                            hasInvalidQuantity ||
+                            isFetchingPaymentIntent
+                          }
                         >
                           {isProcessing ? (
                             <>
@@ -803,7 +945,10 @@ export default function CheckoutPage() {
                         type="submit"
                         className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg"
                         disabled={
-                          isProcessing || !codVerified || hasInvalidQuantity
+                          isProcessing ||
+                          !codVerified ||
+                          hasInvalidQuantity ||
+                          isFetchingPaymentIntent
                         }
                       >
                         {isProcessing ? (
