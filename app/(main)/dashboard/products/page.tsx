@@ -14,7 +14,6 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import api from "@/app/lib/axios";
 import { Product } from "@/app/types/product";
-
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
@@ -37,24 +36,38 @@ export default function ProductsPage() {
   const { isAuthenticated, isLoading, role } = useAuth();
   const router = useRouter();
   const [products, setProducts] = useState<Product[]>([]);
+  const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10); // Number of products per page
   const [totalPages, setTotalPages] = useState(1);
 
+  // Redirect to login if not authenticated
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
       router.push("/login");
     }
   }, [isAuthenticated, isLoading, router]);
 
+  // Fetch all products from API
   useEffect(() => {
     const fetchProducts = async () => {
       try {
         setLoading(true);
         const res = await api.get(`/api/products`);
-        setProducts(res.data.products);
-        setTotalPages(res.data.pagination?.next?.page - 1 || 1);
+        const fetchedProducts = res.data.products || [];
+        console.log("API Response:", res.data); // Debug: Log full response
+        console.log("Fetched products count:", fetchedProducts.length); // Debug: Log number of products
+        setProducts(fetchedProducts);
+        setFilteredProducts(fetchedProducts);
+        setTotalPages(Math.ceil(fetchedProducts.length / itemsPerPage));
+        if (fetchedProducts.length < 25) {
+          console.warn(
+            "Expected 25 products, but fetched:",
+            fetchedProducts.length
+          );
+        }
       } catch (error) {
         console.error("Failed to fetch products:", error);
       } finally {
@@ -65,23 +78,52 @@ export default function ProductsPage() {
     if (isAuthenticated) {
       fetchProducts();
     }
-  }, [isAuthenticated, currentPage, searchTerm]);
+  }, [isAuthenticated, itemsPerPage]);
 
+  // Handle search filtering
+  useEffect(() => {
+    const filtered = products.filter((product) =>
+      product.name.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+    console.log("Filtered products count:", filtered.length); // Debug: Log filtered count
+    setFilteredProducts(filtered);
+    setTotalPages(Math.ceil(filtered.length / itemsPerPage));
+    setCurrentPage(1); // Reset to first page on search
+  }, [searchTerm, products, itemsPerPage]);
+
+  // Calculate products to display on the current page
+  const indexOfLastProduct = currentPage * itemsPerPage;
+  const indexOfFirstProduct = indexOfLastProduct - itemsPerPage;
+  const currentProducts = filteredProducts.slice(
+    indexOfFirstProduct,
+    indexOfLastProduct
+  );
+  console.log("Current page products count:", currentProducts.length); // Debug: Log current page count
+
+  // Handle product deletion
   const handleDelete = async (id: string) => {
     try {
       await api.delete(`/api/products/${id}`);
-      setProducts(products.filter((product) => product._id !== id));
+      const updatedProducts = products.filter((product) => product._id !== id);
+      setProducts(updatedProducts);
+      setFilteredProducts(updatedProducts);
+      setTotalPages(Math.ceil(updatedProducts.length / itemsPerPage));
+      if (currentProducts.length === 1 && currentPage > 1) {
+        setCurrentPage((prev) => prev - 1);
+      }
     } catch (error) {
       console.error("Failed to delete product:", error);
     }
   };
 
+  // Loading or unauthenticated state
   if (isLoading || !isAuthenticated) {
     return <div>Loading...</div>;
   }
 
   return (
     <div className="flex flex-col gap-4">
+      {/* Header and Add Product Button */}
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">Products</h1>
         {(role === "admin" || role === "wholesaler") && (
@@ -90,12 +132,25 @@ export default function ProductsPage() {
           </Link>
         )}
       </div>
+
+      {/* Search Input */}
       <Input
         placeholder="Search products..."
         value={searchTerm}
         onChange={(e) => setSearchTerm(e.target.value)}
         className="max-w-sm"
       />
+
+      {/* Debug Info */}
+      <div>
+        {products.length < 25 && (
+          <p className="text-yellow-600">
+            Warning: Only {products.length} products fetched. Expected 25.
+          </p>
+        )}
+      </div>
+
+      {/* Products Table */}
       <div className="rounded-md border">
         <Table>
           <TableHeader>
@@ -115,14 +170,14 @@ export default function ProductsPage() {
                   Loading...
                 </TableCell>
               </TableRow>
-            ) : products.length === 0 ? (
+            ) : currentProducts.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={6} className="text-center">
                   No products found
                 </TableCell>
               </TableRow>
             ) : (
-              products.map((product) => (
+              currentProducts.map((product) => (
                 <TableRow key={product._id}>
                   <TableCell className="font-medium">{product.name}</TableCell>
                   <TableCell>{product.category}</TableCell>
@@ -145,7 +200,7 @@ export default function ProductsPage() {
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem
                           onClick={() =>
-                            router.push(`/products/Tk{product._id}`)
+                            router.push(`/products/${product._id}`)
                           }
                         >
                           View
@@ -178,12 +233,19 @@ export default function ProductsPage() {
           </TableBody>
         </Table>
       </div>
+
+      {/* Pagination */}
       <Pagination>
         <PaginationContent>
           <PaginationItem>
             <PaginationPrevious
               onClick={() =>
                 setCurrentPage((prev) => (prev > 1 ? prev - 1 : prev))
+              }
+              className={
+                currentPage === 1
+                  ? "cursor-pointer opacity-50"
+                  : "cursor-pointer"
               }
             />
           </PaginationItem>
@@ -196,6 +258,11 @@ export default function ProductsPage() {
             <PaginationNext
               onClick={() =>
                 setCurrentPage((prev) => (prev < totalPages ? prev + 1 : prev))
+              }
+              className={
+                currentPage === totalPages
+                  ? "hover:cursor-pointer opacity-50"
+                  : "cursor-pointer"
               }
             />
           </PaginationItem>

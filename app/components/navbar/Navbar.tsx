@@ -279,12 +279,11 @@ export function Navbar() {
           {[
             { name: "All Products", path: "/products" },
             { name: "Today's Deals", path: "/deals" },
-            { name: "Laptops", path: "/categories/electronics" },
-            { name: "Mobiles", path: "/categories/fashion" },
-            { name: "Accessories", path: "/categories/home" },
+
+            { name: "Mobiles", path: "/products" },
           ].map((item) => (
             <Link
-              key={item.path}
+              key={item.name}
               href={item.path}
               className={`text-sm font-medium text-white hover:text-yellow-100 ${
                 pathname === item.path ? "font-bold underline" : ""

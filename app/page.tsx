@@ -12,18 +12,8 @@ export default function Home() {
       <Navbar />
 
       <AmazonStyleHomepage />
-      <Hero
-        title="Premium Digital Devices Solutions"
-        description="Discover our high-quality digital Devices equipment and supplies for your business needs"
-        ctaText="Shop Now"
-        ctaLink="/products"
-        secondaryText="Learn More"
-        secondaryLink="/about"
-      />
-      {/* <CategorySection /> */}
-      {/* <FeaturedProducts /> */}
+
       <ProductGrid />
-      <Testimonials />
       <Newsletter />
     </main>
   );

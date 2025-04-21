@@ -18,7 +18,7 @@ import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 import api from "@/app/lib/axios";
 import { Checkbox } from "@/components/ui/checkbox";
-import { StripeForm, StripeProvider } from "@/app/checkout/Stripe";
+import { StripeProvider, StripeForm } from "@/app/checkout/Stripe";
 
 export default function CheckoutPage() {
   const { cartItems, cartCount, clearCart, updateQuantity, removeFromCart } =
@@ -28,9 +28,13 @@ export default function CheckoutPage() {
   const [paymentMethod, setPaymentMethod] = useState("credit");
   const [codVerified, setCodVerified] = useState(false);
   const [clientSecret, setClientSecret] = useState("");
+  const [savedPaymentMethodId, setSavedPaymentMethodId] = useState<
+    string | null
+  >(null);
+  const [cardDetailsProvided, setCardDetailsProvided] = useState(false);
+  const [isLoadingPaymentIntent, setIsLoadingPaymentIntent] = useState(false);
   const router = useRouter();
 
-  // Minimum order quantity rules
   const getMinimumQuantity = (price: number) => {
     if (price <= 20000) return 5;
     if (price > 20000 && price <= 80000) return 3;
@@ -72,9 +76,9 @@ export default function CheckoutPage() {
     billingState: "",
     billingPostalCode: "",
     billingCountry: "bd",
+    useSavedCard: false,
   });
 
-  // Calculate shipping and taxes
   const shippingCost = formData.city === "Dhaka" ? 60 : 100;
   const subtotal = cartItems.reduce(
     (sum, item) => sum + item.price * item.quantity,
@@ -125,7 +129,7 @@ export default function CheckoutPage() {
         phone: formData.phone,
       });
 
-      if (response.data.verified) {
+      if (response.data.success && response.data.verified) {
         setCodVerified(true);
         toast.success("COD verification successful");
       } else {
@@ -193,10 +197,20 @@ export default function CheckoutPage() {
       return false;
     }
 
+    if (
+      paymentMethod === "credit" &&
+      !formData.useSavedCard &&
+      !cardDetailsProvided
+    ) {
+      toast.error("Please enter valid card details");
+      return false;
+    }
+
     return true;
   };
 
   const handlePaymentIntentCreation = async () => {
+    setIsLoadingPaymentIntent(true);
     try {
       const paymentIntentResponse = await api.post(
         "/api/orders/stripe/create-payment-intent",
@@ -229,6 +243,9 @@ export default function CheckoutPage() {
           taxAmount,
           subtotal,
           total,
+          paymentMethodId: formData.useSavedCard
+            ? savedPaymentMethodId
+            : undefined,
         }
       );
 
@@ -236,20 +253,43 @@ export default function CheckoutPage() {
         throw new Error("No client secret received");
       }
 
-      return paymentIntentResponse.data.clientSecret;
+      console.log("Payment Intent Created:", paymentIntentResponse.data);
+      return paymentIntentResponse.data;
     } catch (error: any) {
-      toast.error("Payment initialization failed", {
+      console.error("Payment Intent Creation Error:", error);
+      toast.error("Failed to initialize payment", {
         description: error.response?.data?.message || error.message,
       });
       throw error;
+    } finally {
+      setIsLoadingPaymentIntent(false);
     }
   };
 
   const handleStripePayment = async () => {
     try {
-      const clientSecret = await handlePaymentIntentCreation();
-      setClientSecret(clientSecret);
+      const response = await handlePaymentIntentCreation();
+      setClientSecret(response.clientSecret);
+
+      if (formData.useSavedCard && response.paymentIntentId) {
+        const paymentIntentStatus = await api.get(
+          `/api/orders/stripe/payment-intent-status/${response.paymentIntentId}`
+        );
+
+        if (paymentIntentStatus.data.status === "succeeded") {
+          await handlePaymentSuccess(response.paymentIntentId);
+        } else if (paymentIntentStatus.data.status === "requires_action") {
+          toast.info("Additional authentication required for saved card");
+          setClientSecret(response.clientSecret);
+        } else {
+          toast.error("Payment intent not confirmed");
+          setIsProcessing(false);
+        }
+      }
     } catch (error: any) {
+      toast.error("Payment failed", {
+        description: error.response?.data?.message || error.message,
+      });
       setIsProcessing(false);
     }
   };
@@ -261,8 +301,13 @@ export default function CheckoutPage() {
       });
 
       if (orderResponse.data.success) {
+        toast.success("Order placed successfully!", {
+          description: "Your order has been confirmed.",
+        });
         clearCart();
         router.push("/order/success");
+      } else {
+        throw new Error(orderResponse.data.message || "Order creation failed");
       }
     } catch (error: any) {
       toast.error("Order creation failed", {
@@ -300,14 +345,20 @@ export default function CheckoutPage() {
               country: formData.billingCountry,
               phone: formData.phone,
             },
+        shippingCost,
       });
 
       if (orderResponse.data.success) {
+        toast.success("Order placed successfully!", {
+          description: "Your COD order has been confirmed.",
+        });
         clearCart();
         router.push("/order/success");
+      } else {
+        throw new Error(orderResponse.data.message || "COD order failed");
       }
     } catch (error: any) {
-      toast.error("Order failed", {
+      toast.error("COD order failed", {
         description: error.response?.data?.message || error.message,
       });
     } finally {
@@ -317,7 +368,7 @@ export default function CheckoutPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!validateForm()) return;
+    if (!validateForm() || isProcessing) return;
 
     setIsProcessing(true);
 
@@ -332,8 +383,46 @@ export default function CheckoutPage() {
         paymentMethod === "credit" ? "Payment failed" : "Order failed",
         { description: error.message }
       );
+      setIsProcessing(false);
     }
   };
+
+  // Initialize clientSecret when selecting credit card payment
+  useEffect(() => {
+    if (
+      paymentMethod === "credit" &&
+      !formData.useSavedCard &&
+      isAuthenticated &&
+      cartItems.length > 0
+    ) {
+      handlePaymentIntentCreation()
+        .then((response) => {
+          setClientSecret(response.clientSecret);
+        })
+        .catch((error) => {
+          console.error("Failed to initialize clientSecret:", error);
+        });
+    } else {
+      setClientSecret("");
+      setCardDetailsProvided(false);
+    }
+  }, [paymentMethod, formData.useSavedCard, isAuthenticated, cartItems]);
+
+  // Fetch saved payment methods
+  useEffect(() => {
+    const fetchSavedPaymentMethods = async () => {
+      try {
+        // Mocked for demonstration; replace with actual API call
+        setSavedPaymentMethodId("pm_123456789");
+      } catch (error) {
+        console.error("Failed to fetch saved payment methods:", error);
+      }
+    };
+
+    if (isAuthenticated) {
+      fetchSavedPaymentMethods();
+    }
+  }, [isAuthenticated]);
 
   if (authLoading) {
     return (
@@ -586,6 +675,7 @@ export default function CheckoutPage() {
                       setPaymentMethod(value);
                       setCodVerified(false);
                       setClientSecret("");
+                      setCardDetailsProvided(false);
                     }}
                     className="grid gap-4"
                   >
@@ -614,22 +704,58 @@ export default function CheckoutPage() {
                     </div>
                   </RadioGroup>
 
-                  {paymentMethod === "credit" ? (
-                    clientSecret ? (
-                      <StripeProvider clientSecret={clientSecret}>
-                        <StripeForm
-                          clientSecret={clientSecret}
-                          onPaymentSuccess={handlePaymentSuccess}
-                          onError={(error) => {
-                            toast.error("Payment failed", {
-                              description: error.message,
-                            });
-                            setIsProcessing(false);
-                          }}
-                        />
-                      </StripeProvider>
-                    ) : (
-                      <div className="space-y-4 pt-4">
+                  {paymentMethod === "credit" && (
+                    <div className="space-y-4">
+                      {savedPaymentMethodId && (
+                        <div className="flex items-center space-x-2">
+                          <Checkbox
+                            id="useSavedCard"
+                            checked={formData.useSavedCard}
+                            onCheckedChange={(checked) => {
+                              setFormData({
+                                ...formData,
+                                useSavedCard: Boolean(checked),
+                              });
+                              setClientSecret("");
+                              setCardDetailsProvided(false);
+                            }}
+                          />
+                          <Label htmlFor="useSavedCard">
+                            Use saved card (ending in XXXX)
+                          </Label>
+                        </div>
+                      )}
+
+                      {paymentMethod === "credit" && !formData.useSavedCard ? (
+                        isLoadingPaymentIntent ? (
+                          <div className="flex items-center justify-center p-4">
+                            <Loader2 className="h-6 w-6 animate-spin" />
+                            <span className="ml-2">
+                              Loading payment form...
+                            </span>
+                          </div>
+                        ) : clientSecret ? (
+                          <StripeProvider clientSecret={clientSecret}>
+                            <StripeForm
+                              clientSecret={clientSecret}
+                              onPaymentSuccess={handlePaymentSuccess}
+                              onError={(error) => {
+                                toast.error("Payment failed", {
+                                  description: error.message,
+                                });
+                                setIsProcessing(false);
+                              }}
+                              onCardChange={(event) => {
+                                setCardDetailsProvided(event.complete);
+                              }}
+                            />
+                          </StripeProvider>
+                        ) : (
+                          <p className="text-red-500">
+                            Failed to load payment form. Please try again.
+                          </p>
+                        )
+                      ) : (
                         <Button
                           type="submit"
                           className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg"
@@ -644,9 +770,11 @@ export default function CheckoutPage() {
                             `Pay ${total.toFixed(2)}৳`
                           )}
                         </Button>
-                      </div>
-                    )
-                  ) : (
+                      )}
+                    </div>
+                  )}
+
+                  {paymentMethod === "cod" && (
                     <div className="pt-4 space-y-4">
                       <div className="p-4 bg-yellow-50 rounded-lg border border-yellow-200">
                         <p className="text-sm text-yellow-800">
@@ -684,7 +812,7 @@ export default function CheckoutPage() {
                             Processing...
                           </>
                         ) : (
-                          `Pay ${total.toFixed(2)}৳`
+                          `Place Order ${total.toFixed(2)}৳`
                         )}
                       </Button>
                     </div>

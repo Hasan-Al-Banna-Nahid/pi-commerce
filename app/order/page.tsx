@@ -200,7 +200,7 @@ export default function OrdersPage() {
                         <div className="relative h-16 w-16 overflow-hidden rounded-md border">
                           <Image
                             src={
-                              item.product.images?.[0] ||
+                              item?.product?.images?.[0] ||
                               "/placeholder-image.png"
                             }
                             width={300}

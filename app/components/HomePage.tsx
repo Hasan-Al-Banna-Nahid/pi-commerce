@@ -5,70 +5,90 @@ import Image from "next/image";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { Newsletter } from "./newsletter";
+import { useProducts } from "@/app/hooks/useProduct"; // Adjust the import path as needed
+import { useRouter } from "next/navigation";
 
 const AmazonStyleHomepage = () => {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
+  const router = useRouter();
+  // Use the useProducts hook to fetch products
+  const { products, loading, error, fetchProducts } = useProducts();
 
-  // Sample data
-  const heroImages = [
-    { id: 1, src: "/images/hero1.jpg", alt: "Electronics Sale" },
-    { id: 2, src: "/images/hero2.webp", alt: "Fashion Deals" },
-    { id: 3, src: "/images/hero3.jpg", alt: "Home Essentials" },
-  ];
+  // Derive hero images from the first 3 products
+  const heroImages = products.slice(0, 3).map((product, index) => ({
+    id: product._id,
+    src: product.images[0] || "/images/placeholder.jpg",
+    alt: product.name,
+  }));
+  const getCategoryIcon = (category: string) => {
+    const iconMap: Record<string, string> = {
+      mobile: "",
+      tablet: "",
+    };
+    return iconMap[category] || "🛒"; // Fallback icon
+  };
+  // Derive categories dynamically from product.category
+  const categories = Object.entries(
+    products.reduce((acc, product) => {
+      if (product.category) {
+        acc[product.category] = (acc[product.category] || 0) + 1;
+      }
+      return acc;
+    }, {} as Record<string, number>)
+  ).map(([name, count], index) => ({
+    id: index + 1,
+    name,
+    icon: getCategoryIcon(name), // Function to assign an icon
+    count,
+  }));
 
-  const categories = [
-    { id: 1, name: "Electronics", icon: "💻", count: 1243 },
-    { id: 2, name: "Fashion", icon: "👕", count: 876 },
-    { id: 3, name: "Home & Kitchen", icon: "🏠", count: 654 },
-    { id: 4, name: "Beauty", icon: "💄", count: 432 },
-    { id: 5, name: "Toys", icon: "🧸", count: 321 },
-    { id: 6, name: "Sports", icon: "⚽", count: 210 },
-  ];
-
-  const deals = [
-    {
-      id: 1,
-      name: "Wireless Headphones",
-      price: "Tk59.99",
-      originalPrice: "Tk99.99",
-      discount: "40% off",
-      image: "/images/deal.webp",
-    },
-    {
-      id: 2,
-      name: "Smart Watch",
-      price: "Tk129.99",
-      originalPrice: "Tk199.99",
-      discount: "35% off",
-      image: "/images/deal2.webp",
-    },
-    {
-      id: 3,
-      name: "Bluetooth Speaker",
-      price: "Tk39.99",
-      originalPrice: "Tk69.99",
-      discount: "43% off",
-      image: "/images/deal3.jpg",
-    },
-    {
-      id: 4,
-      name: "Fitness Tracker",
-      price: "Tk49.99",
-      originalPrice: "Tk79.99",
-      discount: "38% off",
-      image: "/images/deal4.webp",
-    },
-  ];
+  // Function to assign icons to categories (customize as needed)
 
   // Auto-rotate hero images
   useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentSlide((prev) => (prev + 1) % heroImages.length);
-    }, 5000);
-    return () => clearInterval(interval);
+    if (heroImages.length > 0) {
+      const interval = setInterval(() => {
+        setCurrentSlide((prev) => (prev + 1) % heroImages.length);
+      }, 5000);
+      return () => clearInterval(interval);
+    }
   }, [heroImages.length]);
+
+  // Transform products into deals format (assuming some products have discounts)
+  const deals = products.slice(0, 4).map((product) => ({
+    id: product._id,
+    name: product.name,
+    price: `Tk${product.price.toFixed(2)}`,
+    originalPrice: product.costPrice
+      ? `Tk${product.costPrice.toFixed(2)}`
+      : undefined,
+    discount: product.costPrice
+      ? `${Math.round(
+          ((product.costPrice - product.price) / product.costPrice) * 100
+        )}% off`
+      : undefined,
+    image: product.images[0] || "/images/placeholder.jpg",
+  }));
+
+  // Recommended products
+  const recommended = products.map((product) => ({
+    id: product._id,
+    name: product.name,
+    price: `Tk${product.price.toFixed(2)}`,
+    originalPrice: product.costPrice
+      ? `Tk${product.costPrice.toFixed(2)}`
+      : undefined,
+    image: product.images[0] || "/images/placeholder.jpg",
+  }));
+
+  if (loading) {
+    return <div className="text-center py-12">Loading products...</div>;
+  }
+
+  if (error) {
+    return <div className="text-center py-12 text-red-500">Error: {error}</div>;
+  }
 
   return (
     <div className="bg-gray-100 min-h-screen">
@@ -87,7 +107,7 @@ const AmazonStyleHomepage = () => {
                 src={image.src}
                 alt={image.alt}
                 fill
-                className="object-contain" // Changed from object-cover to object-contain
+                className="object-contain"
                 priority={index === 0}
                 sizes="100vw"
               />
@@ -147,24 +167,6 @@ const AmazonStyleHomepage = () => {
         </div>
       </div>
 
-      {/* Categories Grid */}
-      <div className="container mx-auto px-4 py-8">
-        <h2 className="text-2xl font-bold mb-6">Shop by Category</h2>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-          {categories.map((category) => (
-            <motion.div
-              key={category.id}
-              whileHover={{ y: -5 }}
-              className="bg-white rounded-lg shadow-sm p-4 text-center cursor-pointer hover:shadow-md transition-shadow"
-            >
-              <div className="text-4xl mb-2">{category.icon}</div>
-              <h3 className="font-medium">{category.name}</h3>
-              <p className="text-sm text-gray-500">{category.count} items</p>
-            </motion.div>
-          ))}
-        </div>
-      </div>
-
       {/* Today's Deals */}
       <div className="bg-white py-8">
         <div className="container mx-auto px-4">
@@ -196,9 +198,11 @@ const AmazonStyleHomepage = () => {
                     fill
                     className="object-contain p-4"
                   />
-                  <div className="absolute top-2 left-2 bg-red-600 text-white text-xs font-bold px-2 py-1 rounded">
-                    {deal.discount}
-                  </div>
+                  {deal.discount && (
+                    <div className="absolute top-2 left-2 bg-red-600 text-white text-xs font-bold px-2 py-1 rounded">
+                      {deal.discount}
+                    </div>
+                  )}
                 </div>
                 <div className="p-4">
                   <h3 className="font-medium mb-1 line-clamp-2">{deal.name}</h3>
@@ -206,17 +210,20 @@ const AmazonStyleHomepage = () => {
                     <span className="text-lg font-bold text-amber-600">
                       {deal.price}
                     </span>
-                    <span className="text-sm text-gray-500 line-through">
-                      {deal.originalPrice}
-                    </span>
+                    {deal.originalPrice && (
+                      <span className="text-sm text-gray-500 line-through">
+                        {deal.originalPrice}
+                      </span>
+                    )}
                   </div>
                   <Button
                     size="sm"
+                    onClick={() => router.push(`/products/`)}
                     className="w-full mt-3 bg-amber-500 hover:bg-amber-600 text-black"
                     onMouseEnter={() => setIsHovered(true)}
                     onMouseLeave={() => setIsHovered(false)}
                   >
-                    {isHovered ? "Add to Cart" : "Buy Now"}
+                    {isHovered ? "View Details" : "Buy Now"}
                   </Button>
                 </div>
               </motion.div>
@@ -230,7 +237,7 @@ const AmazonStyleHomepage = () => {
         <h2 className="text-2xl font-bold mb-6">Recommended For You</h2>
         <div className="relative">
           <div className="flex overflow-x-auto pb-4 scrollbar-hide space-x-4">
-            {[...deals, ...deals].map((item, index) => (
+            {recommended.map((item, index) => (
               <motion.div
                 key={`${item.id}-${index}`}
                 whileHover={{ scale: 1.02 }}
