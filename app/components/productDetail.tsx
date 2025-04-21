@@ -14,6 +14,8 @@ import { Star, Truck, Shield, ChevronLeft } from "lucide-react";
 import Image from "next/image";
 import { motion } from "framer-motion";
 import { Navbar } from "./navbar/Navbar";
+import * as Dialog from "@radix-ui/react-dialog"; // ShadCN Dialog
+import { X } from "lucide-react";
 
 export default function ProductDetailClient({ id }: { id: string }) {
   const router = useRouter();
@@ -22,6 +24,8 @@ export default function ProductDetailClient({ id }: { id: string }) {
   const [loading, setLoading] = useState(true);
   const [selectedImage, setSelectedImage] = useState(0);
   const [quantity, setQuantity] = useState(1);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
 
   useEffect(() => {
     const fetchProduct = async () => {
@@ -87,7 +91,8 @@ export default function ProductDetailClient({ id }: { id: string }) {
       quantity: quantity,
       image: product.images[0],
     });
-    router.push("/checkout");
+    setSelectedProduct(product);
+    setIsModalOpen(true);
   };
 
   const discountedPrice =
@@ -306,6 +311,62 @@ export default function ProductDetailClient({ id }: { id: string }) {
             </div>
           </div>
         </div>
+        {/* Modal */}
+        <Dialog.Root open={isModalOpen} onOpenChange={setIsModalOpen}>
+          <Dialog.Portal>
+            <Dialog.Overlay className="fixed inset-0 bg-black/50 backdrop-blur-sm" />
+            <Dialog.Content className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+              <div className="flex justify-between items-center mb-4">
+                <Dialog.Title className="text-xl font-bold text-gray-900">
+                  Added to Cart
+                </Dialog.Title>
+                <Dialog.Close asChild>
+                  <button className="text-gray-500 hover:text-gray-700">
+                    <X size={24} />
+                  </button>
+                </Dialog.Close>
+              </div>
+
+              {selectedProduct && (
+                <div className="flex items-center space-x-4 mb-6">
+                  <Image
+                    src={selectedProduct.images?.[0] || "/placeholder.jpg"}
+                    alt={selectedProduct.name}
+                    width={80}
+                    height={80}
+                    className="w-20 h-20 object-cover rounded-md"
+                  />
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">
+                      {selectedProduct.name}
+                    </h3>
+                    <p className="text-sm text-gray-600">
+                      Tk.{selectedProduct.price.toFixed(2)}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              <p className="text-sm text-gray-600 mb-6">
+                The item has been successfully added to your cart.
+              </p>
+
+              <div className="flex justify-between space-x-4">
+                <Dialog.Close asChild>
+                  <button className="flex-1 bg-gray-200 text-gray-900 font-semibold py-2 rounded-md hover:bg-gray-300 transition">
+                    Continue Shopping
+                  </button>
+                </Dialog.Close>
+                <button
+                  onClick={() => router.push("/checkout")}
+                  className="flex-1 bg-blue-600 text-white font-semibold py-2 rounded-md hover:bg-blue-700 transition"
+                >
+                  Checkout
+                </button>
+              </div>
+            </Dialog.Content>
+          </Dialog.Portal>
+        </Dialog.Root>
       </div>
     </div>
   );

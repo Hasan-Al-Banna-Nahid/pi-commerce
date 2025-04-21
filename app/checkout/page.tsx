@@ -30,19 +30,16 @@ export default function CheckoutPage() {
   const [clientSecret, setClientSecret] = useState("");
   const router = useRouter();
 
-  // Dynamic minimum order quantity based on price
+  // Minimum order quantity rules
   const getMinimumQuantity = (price: number) => {
     if (price <= 20000) return 5;
     if (price > 20000 && price <= 80000) return 3;
-    return 1; // for prices > 80000
+    return 1;
   };
 
-  // Check if any item doesn't meet minimum quantity requirement
   const hasInvalidQuantity = cartItems.some(
     (item) => item.quantity < getMinimumQuantity(item.price)
   );
-
-  const totalQuantity = cartItems.reduce((sum, item) => sum + item.quantity, 0);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -77,49 +74,25 @@ export default function CheckoutPage() {
     billingCountry: "bd",
   });
 
+  // Calculate shipping and taxes
   const shippingCost = formData.city === "Dhaka" ? 60 : 100;
   const subtotal = cartItems.reduce(
     (sum, item) => sum + item.price * item.quantity,
     0
   );
 
-  // Tax calculations
-  const customsDuty = subtotal > 80000 ? 0 : subtotal * 0.05; // 5% but 0 for orders > 80k
-  const supplementaryDuty = subtotal * 0.1; // SD 10%
-  const vat = subtotal * 0.15; // VAT 15%
-  const ait = subtotal * 0.05; // AIT 5%
-  const at = subtotal * 0.05; // AT 5%
-
-  const total =
-    subtotal + shippingCost + customsDuty + supplementaryDuty + vat + ait + at;
-
-  const logPaymentError = (error: any, context: string) => {
-    console.error(`[Payment Error] ${context}:`, {
-      timestamp: new Date().toISOString(),
-      error: {
-        message: error.message,
-        stack: error.stack,
-        response: error.response?.data || null,
-      },
-      user: user?.id || "anonymous",
-      cart: {
-        itemCount: cartCount,
-        total,
-        items: cartItems.map((item) => ({
-          id: item.id,
-          quantity: item.quantity,
-          price: item.price,
-        })),
-      },
-      paymentMethod,
-      formData: {
-        // Don't log sensitive data like full addresses
-        city: formData.city,
-        country: formData.country,
-        billingSameAsShipping: formData.billingSameAsShipping,
-      },
-    });
+  const calculateTaxes = (subtotal: number) => {
+    const customsDuty = subtotal > 80000 ? 0 : subtotal * 0.05;
+    const supplementaryDuty = subtotal * 0.1;
+    const vat = subtotal * 0.15;
+    const ait = subtotal * 0.05;
+    const at = subtotal * 0.05;
+    return customsDuty + supplementaryDuty + vat + ait + at;
   };
+
+  const taxAmount = calculateTaxes(subtotal);
+  const total = subtotal + shippingCost + taxAmount;
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
@@ -148,8 +121,7 @@ export default function CheckoutPage() {
 
     setIsProcessing(true);
     try {
-      // Replace with actual API call to your backend
-      const response = await api.post("/api/payments/verify-cod", {
+      const response = await api.post("/api/orders/cod/verify", {
         phone: formData.phone,
       });
 
@@ -160,8 +132,6 @@ export default function CheckoutPage() {
         throw new Error(response.data.message || "COD verification failed");
       }
     } catch (error: any) {
-      logPaymentError(error, "COD Verification");
-
       toast.error("COD verification failed", {
         description: error.response?.data?.message || error.message,
       });
@@ -171,41 +141,17 @@ export default function CheckoutPage() {
     }
   };
 
-  const handleCodPayment = async () => {
-    try {
-      const orderResponse = await createOrder();
-
-      if (!orderResponse.success) {
-        throw new Error(orderResponse.message || "Order creation failed");
-      }
-
-      clearCart();
-      toast.success("Order placed successfully");
-      router.push(`/order/success/${orderResponse.orderId}`);
-    } catch (error: any) {
-      logPaymentError(error, "COD Payment Submission");
-
-      toast.error("Order failed", {
-        description:
-          error.response?.data?.message ||
-          "There was an issue processing your order. Please try again.",
-      });
-    }
-  };
   const validateForm = () => {
-    // Check minimum order quantity for each item
     if (hasInvalidQuantity) {
-      const invalidItems = cartItems.filter(
-        (item) => item.quantity < getMinimumQuantity(item.price)
-      );
-
-      invalidItems.forEach((item) => {
-        toast.error(
-          `Minimum order for ${item.name} (${item.price.toFixed(
-            2
-          )}৳) is ${getMinimumQuantity(item.price)} pieces`
-        );
-      });
+      cartItems
+        .filter((item) => item.quantity < getMinimumQuantity(item.price))
+        .forEach((item) => {
+          toast.error(
+            `Minimum order for ${item.name} (${item.price.toFixed(
+              2
+            )}৳) is ${getMinimumQuantity(item.price)} pieces`
+          );
+        });
       return false;
     }
 
@@ -250,62 +196,6 @@ export default function CheckoutPage() {
     return true;
   };
 
-  const createOrder = async (paymentIntentId?: string) => {
-    const shippingMethod = formData.city === "Dhaka" ? "standard" : "express";
-
-    const shippingAddress = {
-      street: formData.street,
-      city: formData.city,
-      state: formData.state,
-      postalCode: formData.postalCode,
-      country: formData.country,
-      phone: formData.phone,
-    };
-
-    const billingAddress = formData.billingSameAsShipping
-      ? shippingAddress
-      : {
-          street: formData.billingStreet,
-          city: formData.billingCity,
-          state: formData.billingState,
-          postalCode: formData.billingPostalCode,
-          country: formData.billingCountry,
-          phone: formData.phone,
-        };
-
-    const orderData = {
-      items: cartItems,
-      shippingAddress,
-      billingAddress,
-      paymentMethod: paymentMethod === "cod" ? "cash_on_delivery" : "stripe",
-      shippingCost,
-      shippingMethod,
-      tax: vat + ait + at + supplementaryDuty + customsDuty,
-      total,
-      currency: "bdt",
-      ...(paymentIntentId && { paymentIntentId }),
-    };
-
-    const orderResponse = await api.post("/api/orders", orderData);
-    return orderResponse.data;
-  };
-
-  const handleStripePayment = async () => {
-    try {
-      const clientSecret = await handlePaymentIntentCreation();
-      setClientSecret(clientSecret);
-    } catch (error: any) {
-      logPaymentError(error, "Stripe Payment Intent Creation");
-
-      toast.error("Payment initialization failed", {
-        description:
-          error.response?.data?.message ||
-          "We couldn't initialize the payment process. Please try again.",
-      });
-      setIsProcessing(false);
-    }
-  };
-
   const handlePaymentIntentCreation = async () => {
     try {
       const paymentIntentResponse = await api.post(
@@ -313,7 +203,7 @@ export default function CheckoutPage() {
         {
           items: cartItems.map((item) => ({
             id: item.id,
-            name: item.name, // ✅ add name
+            name: item.name,
             quantity: item.quantity,
             price: item.price,
           })),
@@ -336,59 +226,112 @@ export default function CheckoutPage() {
                 phone: formData.phone,
               },
           shippingCost,
-          subtotal, // ✅ add subtotal
-          taxAmount: vat + ait + at + supplementaryDuty + customsDuty, // ✅ add taxAmount
+          taxAmount,
+          subtotal,
           total,
-          currency: "bdt",
-          metadata: {
-            userId: user?.id || "guest",
-            cartId: cartItems.map((item) => item.id).join(","),
-          },
         }
       );
 
       if (!paymentIntentResponse.data.clientSecret) {
-        throw new Error("No client secret received from server");
+        throw new Error("No client secret received");
       }
 
       return paymentIntentResponse.data.clientSecret;
     } catch (error: any) {
-      logPaymentError(error, "Payment Intent Creation");
+      toast.error("Payment initialization failed", {
+        description: error.response?.data?.message || error.message,
+      });
       throw error;
+    }
+  };
+
+  const handleStripePayment = async () => {
+    try {
+      const clientSecret = await handlePaymentIntentCreation();
+      setClientSecret(clientSecret);
+    } catch (error: any) {
+      setIsProcessing(false);
+    }
+  };
+
+  const handlePaymentSuccess = async (paymentIntentId: string) => {
+    try {
+      const orderResponse = await api.post("/api/orders", {
+        paymentIntentId,
+      });
+
+      if (orderResponse.data.success) {
+        clearCart();
+        router.push("/order/success");
+      }
+    } catch (error: any) {
+      toast.error("Order creation failed", {
+        description: error.response?.data?.message || error.message,
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleCodPayment = async () => {
+    try {
+      const orderResponse = await api.post("/api/orders/cod", {
+        items: cartItems.map((item) => ({
+          id: item.id,
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price,
+        })),
+        shippingAddress: {
+          street: formData.street,
+          city: formData.city,
+          state: formData.state,
+          postalCode: formData.postalCode,
+          country: formData.country,
+          phone: formData.phone,
+        },
+        billingAddress: formData.billingSameAsShipping
+          ? undefined
+          : {
+              street: formData.billingStreet,
+              city: formData.billingCity,
+              state: formData.billingState,
+              postalCode: formData.billingPostalCode,
+              country: formData.billingCountry,
+              phone: formData.phone,
+            },
+      });
+
+      if (orderResponse.data.success) {
+        clearCart();
+        router.push("/order/success");
+      }
+    } catch (error: any) {
+      toast.error("Order failed", {
+        description: error.response?.data?.message || error.message,
+      });
+    } finally {
+      setIsProcessing(false);
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!validateForm()) {
-      return;
-    }
+    if (!validateForm()) return;
 
     setIsProcessing(true);
 
     try {
       if (paymentMethod === "credit") {
         await handleStripePayment();
-        return;
-      }
-
-      // Handle COD payment
-      const orderResponse = await createOrder();
-
-      if (orderResponse.success) {
-        clearCart();
-        toast.success("Order placed successfully");
-        router.push(`/order/success/`);
+      } else {
+        await handleCodPayment();
       }
     } catch (error: any) {
       toast.error(
         paymentMethod === "credit" ? "Payment failed" : "Order failed",
-        {
-          description: error.response?.data?.message || error.message,
-        }
+        { description: error.message }
       );
-    } finally {
-      setIsProcessing(false);
     }
   };
 
@@ -400,9 +343,7 @@ export default function CheckoutPage() {
     );
   }
 
-  if (!isAuthenticated) {
-    return null;
-  }
+  if (!isAuthenticated) return null;
 
   if (cartCount === 0) {
     return (
@@ -675,30 +616,10 @@ export default function CheckoutPage() {
 
                   {paymentMethod === "credit" ? (
                     clientSecret ? (
-                      // Update your StripeForm component usage
                       <StripeProvider clientSecret={clientSecret}>
                         <StripeForm
-                          formData={formData}
                           clientSecret={clientSecret}
-                          total={total}
-                          onCreatePaymentIntent={handlePaymentIntentCreation}
-                          isProcessing={isProcessing}
-                          setIsProcessing={setIsProcessing}
-                          onPaymentSuccess={async (paymentIntentId) => {
-                            try {
-                              const orderResponse = await createOrder(
-                                paymentIntentId
-                              );
-                              if (orderResponse.success) {
-                                clearCart();
-                                router.push("/order/success");
-                              }
-                            } catch (error: any) {
-                              toast.error("Order creation failed", {
-                                description: error.message,
-                              });
-                            }
-                          }}
+                          onPaymentSuccess={handlePaymentSuccess}
                           onError={(error) => {
                             toast.error("Payment failed", {
                               description: error.message,
@@ -711,7 +632,6 @@ export default function CheckoutPage() {
                       <div className="space-y-4 pt-4">
                         <Button
                           type="submit"
-                          onClick={handlePaymentIntentCreation}
                           className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg"
                           disabled={isProcessing || hasInvalidQuantity}
                         >
@@ -854,46 +774,14 @@ export default function CheckoutPage() {
                     </span>
                     <span>{shippingCost.toFixed(2)}৳</span>
                   </div>
-                  {/* {customsDuty > 0 && (
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">
-                        Customs Duty (5%)
-                      </span>
-                      <span>{customsDuty.toFixed(2)}৳</span>
-                    </div>
-                  )} */}
-                  {/* <div className="flex justify-between">
-                    <span className="text-muted-foreground">
-                      Supplementary Duty (10%)
-                    </span>
-                    <span>{supplementaryDuty.toFixed(2)}৳</span>
-                  </div> */}
-                  {/* <div className="flex justify-between">
-                    <span className="text-muted-foreground">VAT (15%)</span>
-                    <span>{vat.toFixed(2)}৳</span>
-                  </div> */}
-                  {/* <div className="flex justify-between">
-                    <span className="text-muted-foreground">AIT (5%)</span>
-                    <span>{ait.toFixed(2)}৳</span>
-                  </div> */}
-                  {/* <div className="flex justify-between">
-                    <span className="text-muted-foreground">AT (5%)</span>
-                    <span>{at.toFixed(2)}৳</span>
-                  </div> */}
-                  {/* <div className="flex justify-between">
-                    <span className="text-muted-foreground">
-                      Total Vat (40%)৳
-                    </span>
-                     <span>{at.toFixed(2)}৳</span> 
-                  </div> 
-                  */}
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Taxes & Fees</span>
+                    <span>{taxAmount.toFixed(2)}৳</span>
+                  </div>
 
                   <div className="flex justify-between pt-3 border-t font-medium text-lg">
                     <span>Total</span>
-                    <div className="flex flex-col justify-center items-center">
-                      <span>{total.toFixed(2)}৳</span>
-                      <span>+Including vat & Others.</span>
-                    </div>
+                    <span>{total.toFixed(2)}৳</span>
                   </div>
                 </div>
               </div>
