@@ -16,7 +16,7 @@ interface Product {
   price: number;
   images: string[];
   category: string;
-  subCategory: string[]; // Changed to array of strings
+  subCategory: string[];
   brand: string;
   discount: number;
   rating: number;
@@ -53,16 +53,14 @@ export default function ProductsPage() {
         setLoading(true);
         setError(null);
         const res = await api.get<ApiResponse>("/api/products");
-        // Normalize subCategory to ensure it's always an array
         const fetchedProducts = res.data.products.map((product) => ({
           ...product,
           subCategory: Array.isArray(product.subCategory)
             ? product.subCategory
-            : [product.subCategory].filter(Boolean), // Handle single string or null
+            : [product.subCategory].filter(Boolean),
         }));
         setProducts(fetchedProducts);
 
-        // Dynamically generate categories from products
         const uniqueCategories: string[] = [
           "All",
           ...new Set(
@@ -83,7 +81,6 @@ export default function ProductsPage() {
     fetchProducts();
   }, []);
 
-  // Update subCategories and brands when activeCategory changes
   useEffect(() => {
     if (activeCategory === "All") {
       setSubCategories([]);
@@ -94,7 +91,6 @@ export default function ProductsPage() {
       const filteredByCategory = products.filter(
         (product) => product.category === activeCategory
       );
-      // Flatten and deduplicate subcategories from array
       const uniqueSubCategories = [
         ...new Set(
           filteredByCategory.flatMap((product) => product.subCategory)
@@ -108,7 +104,6 @@ export default function ProductsPage() {
     }
   }, [activeCategory, products]);
 
-  // Filter products based on category, subcategory, and brand
   useEffect(() => {
     let filtered: Product[] = products;
 
@@ -131,7 +126,6 @@ export default function ProductsPage() {
     setFilteredProducts(filtered);
   }, [activeCategory, activeSubcategory, activeBrand, products]);
 
-  // Type-safe category click handler
   const handleCategoryClick = (category: string): void => {
     setActiveCategory(category);
     setActiveSubcategory(null);
@@ -140,46 +134,44 @@ export default function ProductsPage() {
     setShowBrands(false);
   };
 
-  // Type-safe subcategory click handler
   const handleSubcategoryClick = (subcategory: string | null): void => {
     setActiveSubcategory(subcategory);
   };
 
-  // Type-safe brand click handler
   const handleBrandClick = (brand: string | null): void => {
     setActiveBrand(brand);
   };
 
-  // Type-safe toggle subcategory visibility handler
   const toggleSubcategories = (): void => {
     setShowSubcategories((prev) => !prev);
   };
 
-  // Type-safe toggle brand visibility handler
   const toggleBrands = (): void => {
     setShowBrands((prev) => !prev);
   };
 
   return (
-    // bg-gradient-to-br from-purple-800 via-blue-800 to-red-800
-    <div className=" min-h-screen">
+    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100">
       <Navbar />
-      <div className="relative py-12 px-4 sm:px-6 lg:px-8">
+      <div className="relative py-16 px-4 sm:px-6 lg:px-8">
         {/* Category, Subcategory, and Brand Section */}
-        <div className="max-w-7xl mx-auto mb-8">
+        <div className="max-w-7xl mx-auto mb-12">
           {/* Category Tabs and Toggle Buttons */}
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-2 sm:space-y-0">
-            <div className="flex space-x-2 overflow-x-auto pb-2">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0 bg-white rounded-lg shadow-lg p-4">
+            <div className="flex space-x-2 overflow-x-auto">
               {categories.map((category) => (
                 <motion.button
                   key={category}
-                  className={`px-4 py-2 rounded-full text-sm font-semibold transition-colors ${
+                  className={`px-6 py-3 rounded-full text-sm font-semibold transition-all duration-300 ${
                     activeCategory === category
-                      ? "bg-blue-600 text-white"
-                      : "bg-white text-gray-700 hover:bg-gray-200"
+                      ? "bg-gradient-to-r from-slate-800 to-blue-800 text-white shadow-md"
+                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                   }`}
                   onClick={() => handleCategoryClick(category)}
-                  whileHover={{ scale: 1.05 }}
+                  whileHover={{
+                    scale: 1.05,
+                    boxShadow: "0 4px 15px rgba(0,0,0,0.2)",
+                  }}
                   whileTap={{ scale: 0.95 }}
                   aria-pressed={activeCategory === category}
                 >
@@ -188,12 +180,15 @@ export default function ProductsPage() {
               ))}
             </div>
             {activeCategory !== "All" && (
-              <div className="flex space-x-2">
+              <div className="flex space-x-3">
                 {subCategories.length > 0 && (
                   <motion.button
-                    className="px-4 py-2 rounded-full text-sm font-semibold bg-gray-200 text-gray-700 hover:bg-gray-300 transition-colors"
+                    className="px-6 py-3 rounded-full text-sm font-semibold bg-gradient-to-r from-gray-200 to-gray-300 text-gray-800 hover:from-gray-300 hover:to-gray-400 transition-all duration-300 shadow-sm"
                     onClick={toggleSubcategories}
-                    whileHover={{ scale: 1.05 }}
+                    whileHover={{
+                      scale: 1.05,
+                      boxShadow: "0 4px 15px rgba(0,0,0,0.2)",
+                    }}
                     whileTap={{ scale: 0.95 }}
                     aria-label={
                       showSubcategories
@@ -210,9 +205,12 @@ export default function ProductsPage() {
                 )}
                 {brands.length > 0 && (
                   <motion.button
-                    className="px-4 py-2 rounded-full text-sm font-semibold bg-gray-200 text-gray-700 hover:bg-gray-300 transition-colors"
+                    className="px-6 py-3 rounded-full text-sm font-semibold bg-gradient-to-r from-gray-200 to-gray-300 text-gray-800 hover:from-gray-300 hover:to-gray-400 transition-all duration-300 shadow-sm"
                     onClick={toggleBrands}
-                    whileHover={{ scale: 1.05 }}
+                    whileHover={{
+                      scale: 1.05,
+                      boxShadow: "0 4px 15px rgba(0,0,0,0.2)",
+                    }}
                     whileTap={{ scale: 0.95 }}
                     aria-label={showBrands ? "Hide brands" : "Show brands"}
                     aria-controls="brands"
@@ -231,21 +229,24 @@ export default function ProductsPage() {
             subCategories.length > 0 && (
               <motion.div
                 id="subcategories"
-                className="mt-2 pl-4"
+                className="mt-4 bg-white rounded-lg shadow-lg p-4"
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.2 }}
+                transition={{ duration: 0.3 }}
               >
-                <div className="flex space-x-2 overflow-x-auto pb-2">
+                <div className="flex space-x-2 overflow-x-auto">
                   <motion.button
-                    className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
+                    className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-300 ${
                       activeSubcategory === null
-                        ? "bg-blue-500 text-white"
+                        ? "bg-gradient-to-r from-slate-800 to-blue-800 text-white shadow-md"
                         : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                     }`}
                     onClick={() => handleSubcategoryClick(null)}
-                    whileHover={{ scale: 1.05 }}
+                    whileHover={{
+                      scale: 1.05,
+                      boxShadow: "0 4px 15px rgba(0,0,0,0.2)",
+                    }}
                     whileTap={{ scale: 0.95 }}
                     aria-pressed={activeSubcategory === null}
                   >
@@ -254,13 +255,16 @@ export default function ProductsPage() {
                   {subCategories.map((subcategory) => (
                     <motion.button
                       key={subcategory}
-                      className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
+                      className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-300 ${
                         activeSubcategory === subcategory
-                          ? "bg-blue-500 text-white"
+                          ? "bg-gradient-to-r from-slate-800 to-blue-800 text-white shadow-md"
                           : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                       }`}
                       onClick={() => handleSubcategoryClick(subcategory)}
-                      whileHover={{ scale: 1.05 }}
+                      whileHover={{
+                        scale: 1.05,
+                        boxShadow: "0 4px 15px rgba(0,0,0,0.2)",
+                      }}
                       whileTap={{ scale: 0.95 }}
                       aria-pressed={activeSubcategory === subcategory}
                     >
@@ -275,21 +279,24 @@ export default function ProductsPage() {
           {activeCategory !== "All" && showBrands && brands.length > 0 && (
             <motion.div
               id="brands"
-              className="mt-2 pl-4"
+              className="mt-4 bg-white rounded-lg shadow-lg p-4"
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.2 }}
+              transition={{ duration: 0.3 }}
             >
-              <div className="flex space-x-2 overflow-x-auto pb-2">
+              <div className="flex space-x-2 overflow-x-auto">
                 <motion.button
-                  className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
+                  className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-300 ${
                     activeBrand === null
-                      ? "bg-blue-500 text-white"
+                      ? "bg-gradient-to-r from-slate-800 to-blue-800 text-white shadow-md"
                       : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                   }`}
                   onClick={() => handleBrandClick(null)}
-                  whileHover={{ scale: 1.05 }}
+                  whileHover={{
+                    scale: 1.05,
+                    boxShadow: "0 4px 15px rgba(0,0,0,0.2)",
+                  }}
                   whileTap={{ scale: 0.95 }}
                   aria-pressed={activeBrand === null}
                 >
@@ -298,13 +305,16 @@ export default function ProductsPage() {
                 {brands.map((brand) => (
                   <motion.button
                     key={brand}
-                    className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
+                    className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-300 ${
                       activeBrand === brand
-                        ? "bg-blue-500 text-white"
+                        ? "bg-gradient-to-r from-slate-800 to-blue-800 text-white shadow-md"
                         : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                     }`}
                     onClick={() => handleBrandClick(brand)}
-                    whileHover={{ scale: 1.05 }}
+                    whileHover={{
+                      scale: 1.05,
+                      boxShadow: "0 4px 15px rgba(0,0,0,0.2)",
+                    }}
                     whileTap={{ scale: 0.95 }}
                     aria-pressed={activeBrand === brand}
                   >
@@ -340,13 +350,13 @@ export default function ProductsPage() {
                 {filteredProducts.map((product, idx) => (
                   <motion.div
                     key={product._id}
-                    className="bg-white rounded-lg shadow-md overflow-hidden transform transition hover:shadow-xl"
+                    className="bg-white rounded-xl shadow-lg overflow-hidden transform transition-all duration-300 hover:shadow-2xl hover:-translate-y-2"
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: idx * 0.1, duration: 0.5 }}
                   >
                     {/* Product Image */}
-                    <div className="relative">
+                    <div className="relative group">
                       <Image
                         src={
                           product.images?.[0] || "/default-product-image.jpg"
@@ -354,31 +364,28 @@ export default function ProductsPage() {
                         alt={product.name}
                         width={300}
                         height={300}
-                        className="w-full h-48 object-cover transition-transform duration-300 hover:scale-105"
+                        className="w-full h-56 object-cover transition-transform duration-500 group-hover:scale-110"
                       />
                       {idx % 5 === 0 && (
-                        <div className="absolute top-2 left-2 bg-red-500 text-xs font-bold text-white px-2 py-1 rounded">
+                        <div className="absolute top-3 left-3 bg-red-600 text-xs font-bold text-white px-3 py-1 rounded-full shadow-md">
                           Deal of the Day
                         </div>
                       )}
-                      <div className="absolute top-2 right-2 bg-yellow-400 text-xs font-bold text-gray-900 px-2 py-1 rounded">
+                      <div className="absolute top-3 right-3 bg-yellow-400 text-xs font-bold text-gray-900 px-3 py-1 rounded-full shadow-md">
                         Best Seller
                       </div>
+                      {/* Hover Overlay */}
+                      <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-opacity duration-300"></div>
                     </div>
 
                     {/* Product Details */}
-                    <div className="p-4 flex flex-col space-y-3">
-                      <h2 className="text-lg font-semibold text-gray-900 line-clamp-1">
+                    <div className="p-5 flex flex-col space-y-4">
+                      <h2 className="text-lg font-bold text-gray-900 line-clamp-1 hover:text-blue-600 transition-colors duration-200">
                         {product.name}
                       </h2>
                       <p className="text-sm text-gray-600 line-clamp-2">
                         {product.description}
                       </p>
-                      {/* Display subcategories */}
-                      {/* <p className="text-sm text-gray-600">
-                        Subcategories:{" "}
-                        (", ") || "None"}
-                      </p> */}
                       <div className="flex items-center space-x-2">
                         {product.discount > 0 ? (
                           <>
@@ -389,7 +396,7 @@ export default function ProductsPage() {
                             <span className="text-sm text-gray-500 line-through">
                               BDT {product.price.toFixed(2)}
                             </span>
-                            <span className="text-sm text-red-600">
+                            <span className="text-sm text-red-600 font-semibold">
                               {(
                                 (product.discount / product.price) *
                                 100
@@ -408,7 +415,7 @@ export default function ProductsPage() {
                           {[...Array(5)].map((_, i) => (
                             <svg
                               key={i}
-                              className={`w-4 h-4 ${
+                              className={`w-5 h-5 ${
                                 i < Math.round(product.rating)
                                   ? "text-yellow-400"
                                   : "text-gray-300"
@@ -427,7 +434,7 @@ export default function ProductsPage() {
                       </div>
                       <button
                         onClick={() => router.push(`/products/${product._id}`)}
-                        className="w-full bg-yellow-400 text-gray-900 font-semibold py-2 rounded-md hover:bg-yellow-500 transition"
+                        className="w-full bg-gradient-to-r from-slate-800 to-blue-800 text-white font-semibold py-3 rounded-lg hover:from-blue-800 hover:to-slate-800 transition-all duration-300 shadow-md hover:shadow-xl"
                         aria-label={`View details for ${product.name}`}
                       >
                         View Details
