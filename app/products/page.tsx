@@ -151,7 +151,7 @@ export default function ProductsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100">
+    <div className="min-h-screen bg-gray-50">
       <Navbar />
       <div className="relative py-16 px-4 sm:px-6 lg:px-8">
         {/* Category, Subcategory, and Brand Section */}
@@ -164,8 +164,8 @@ export default function ProductsPage() {
                   key={category}
                   className={`px-6 py-3 rounded-full text-sm font-semibold transition-all duration-300 ${
                     activeCategory === category
-                      ? "bg-gradient-to-r from-slate-800 to-blue-800 text-white shadow-md"
-                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                      ? "bg-blue-800 text-white shadow-md"
+                      : "bg-gray-200 text-gray-700 hover:bg-gray-300"
                   }`}
                   onClick={() => handleCategoryClick(category)}
                   whileHover={{
@@ -183,7 +183,7 @@ export default function ProductsPage() {
               <div className="flex space-x-3">
                 {subCategories.length > 0 && (
                   <motion.button
-                    className="px-6 py-3 rounded-full text-sm font-semibold bg-gradient-to-r from-gray-200 to-gray-300 text-gray-800 hover:from-gray-300 hover:to-gray-400 transition-all duration-300 shadow-sm"
+                    className="px-6 py-3 rounded-full text-sm font-semibold bg-gray-200 text-gray-800 hover:bg-gray-300 transition-all duration-300 shadow-sm"
                     onClick={toggleSubcategories}
                     whileHover={{
                       scale: 1.05,
@@ -205,7 +205,7 @@ export default function ProductsPage() {
                 )}
                 {brands.length > 0 && (
                   <motion.button
-                    className="px-6 py-3 rounded-full text-sm font-semibold bg-gradient-to-r from-gray-200 to-gray-300 text-gray-800 hover:from-gray-300 hover:to-gray-400 transition-all duration-300 shadow-sm"
+                    className="px-6 py-3 rounded-full text-sm font-semibold bg-gray-200 text-gray-800 hover:bg-gray-300 transition-all duration-300 shadow-sm"
                     onClick={toggleBrands}
                     whileHover={{
                       scale: 1.05,
@@ -239,8 +239,8 @@ export default function ProductsPage() {
                   <motion.button
                     className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-300 ${
                       activeSubcategory === null
-                        ? "bg-gradient-to-r from-slate-800 to-blue-800 text-white shadow-md"
-                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                        ? "bg-blue-800 text-white shadow-md"
+                        : "bg-gray-200 text-gray-700 hover:bg-gray-300"
                     }`}
                     onClick={() => handleSubcategoryClick(null)}
                     whileHover={{
@@ -257,8 +257,8 @@ export default function ProductsPage() {
                       key={subcategory}
                       className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-300 ${
                         activeSubcategory === subcategory
-                          ? "bg-gradient-to-r from-slate-800 to-blue-800 text-white shadow-md"
-                          : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                          ? "bg-blue-800 text-white shadow-md"
+                          : "bg-gray-200 text-gray-700 hover:bg-gray-300"
                       }`}
                       onClick={() => handleSubcategoryClick(subcategory)}
                       whileHover={{
@@ -289,8 +289,8 @@ export default function ProductsPage() {
                 <motion.button
                   className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-300 ${
                     activeBrand === null
-                      ? "bg-gradient-to-r from-slate-800 to-blue-800 text-white shadow-md"
-                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                      ? "bg-blue-800 text-white shadow-md"
+                      : "bg-gray-200 text-gray-700 hover:bg-gray-300"
                   }`}
                   onClick={() => handleBrandClick(null)}
                   whileHover={{
@@ -307,8 +307,8 @@ export default function ProductsPage() {
                     key={brand}
                     className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-300 ${
                       activeBrand === brand
-                        ? "bg-gradient-to-r from-slate-800 to-blue-800 text-white shadow-md"
-                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                        ? "bg-blue-800 text-white shadow-md"
+                        : "bg-gray-200 text-gray-700 hover:bg-gray-300"
                     }`}
                     onClick={() => handleBrandClick(brand)}
                     whileHover={{
@@ -350,7 +350,7 @@ export default function ProductsPage() {
                 {filteredProducts.map((product, idx) => (
                   <motion.div
                     key={product._id}
-                    className="bg-white rounded-xl shadow-lg overflow-hidden transform transition-all duration-300 hover:shadow-2xl hover:-translate-y-2"
+                    className="bg-white rounded-xl shadow-lg overflow-hidden transition-all duration-300 hover:shadow-2xl hover:-translate-y-2"
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: idx * 0.1, duration: 0.5 }}
@@ -434,7 +434,7 @@ export default function ProductsPage() {
                       </div>
                       <button
                         onClick={() => router.push(`/products/${product._id}`)}
-                        className="w-full bg-gradient-to-r from-slate-800 to-blue-800 text-white font-semibold py-3 rounded-lg hover:from-blue-800 hover:to-slate-800 transition-all duration-300 shadow-md hover:shadow-xl"
+                        className="w-full bg-blue-800 text-white font-semibold py-3 rounded-lg hover:bg-blue-900 transition-all duration-300 shadow-md hover:shadow-xl"
                         aria-label={`View details for ${product.name}`}
                       >
                         View Details
