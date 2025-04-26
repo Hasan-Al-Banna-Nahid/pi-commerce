@@ -21,6 +21,7 @@ const AmazonStyleHomepage = () => {
     src: product.images[0] || "/images/placeholder.jpg",
     alt: product.name,
   }));
+
   const getCategoryIcon = (category: string) => {
     const iconMap: Record<string, string> = {
       mobile: "",
@@ -28,6 +29,7 @@ const AmazonStyleHomepage = () => {
     };
     return iconMap[category] || "🛒"; // Fallback icon
   };
+
   // Derive categories dynamically from product.category
   const categories = Object.entries(
     products.reduce((acc, product) => {
@@ -39,11 +41,9 @@ const AmazonStyleHomepage = () => {
   ).map(([name, count], index) => ({
     id: index + 1,
     name,
-    icon: getCategoryIcon(name), // Function to assign an icon
+    icon: getCategoryIcon(name),
     count,
   }));
-
-  // Function to assign icons to categories (customize as needed)
 
   // Auto-rotate hero images
   useEffect(() => {
@@ -55,7 +55,7 @@ const AmazonStyleHomepage = () => {
     }
   }, [heroImages.length]);
 
-  // Transform products into deals format (assuming some products have discounts)
+  // Transform products into deals format
   const deals = products.slice(0, 4).map((product) => ({
     id: product._id,
     name: product.name,
@@ -218,8 +218,8 @@ const AmazonStyleHomepage = () => {
                   </div>
                   <Button
                     size="sm"
-                    onClick={() => router.push(`/products/`)}
-                    className="w-full mt-3 bg-amber-500 hover:bg-amber-600 text-black"
+                    onClick={() => router.push(`/products/${deal.id}`)} // Dynamic routing
+                    className="w-full mt-3 bg-slate-800 hover:bg-amber-700 text-white"
                     onMouseEnter={() => setIsHovered(true)}
                     onMouseLeave={() => setIsHovered(false)}
                   >
@@ -280,6 +280,13 @@ const AmazonStyleHomepage = () => {
                     ))}
                     <span className="text-xs text-gray-500 ml-1">(124)</span>
                   </div>
+                  <Button
+                    size="sm"
+                    onClick={() => router.push(`/products/${item.id}`)} // Dynamic routing
+                    className="w-full mt-3 bg-slate-800 hover:bg-amber-700 text-white"
+                  >
+                    View Details
+                  </Button>
                 </div>
               </motion.div>
             ))}

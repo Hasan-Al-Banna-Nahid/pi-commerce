@@ -14,14 +14,16 @@ import { Star, Truck, Shield, ChevronLeft } from "lucide-react";
 import Image from "next/image";
 import { motion } from "framer-motion";
 import { Navbar } from "./navbar/Navbar";
-import * as Dialog from "@radix-ui/react-dialog"; // ShadCN Dialog
+import * as Dialog from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
 
 export default function ProductDetailClient({ id }: { id: string }) {
   const router = useRouter();
   const { addToCart } = useCart();
   const [product, setProduct] = useState<Product | null>(null);
+  const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [relatedLoading, setRelatedLoading] = useState(true);
   const [selectedImage, setSelectedImage] = useState(0);
   const [quantity, setQuantity] = useState(1);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -39,8 +41,31 @@ export default function ProductDetailClient({ id }: { id: string }) {
       }
     };
 
+    const fetchRelatedProducts = async () => {
+      if (product) {
+        try {
+          const priceRange = 0.2; // ±20% price range
+          const minPrice = product.price * (1 - priceRange);
+          const maxPrice = product.price * (1 + priceRange);
+          const res = await api.get(`/api/products`);
+          // Filter out the current product
+          const filteredProducts = res.data.products.filter(
+            (p: Product) => p._id !== id
+          );
+          setRelatedProducts(filteredProducts.slice(0, 4)); // Ensure max 4 products
+        } catch (error) {
+          console.error("Failed to fetch related products:", error);
+        } finally {
+          setRelatedLoading(false);
+        }
+      }
+    };
+
     fetchProduct();
-  }, [id]);
+    if (product) {
+      fetchRelatedProducts();
+    }
+  }, [id, product]);
 
   if (loading) {
     return (
@@ -83,15 +108,15 @@ export default function ProductDetailClient({ id }: { id: string }) {
     );
   }
 
-  const handleAddToCart = () => {
+  const handleAddToCart = (productToAdd: Product, qty: number = quantity) => {
     addToCart({
-      id: product._id,
-      name: product.name,
-      price: product.price,
-      quantity: quantity,
-      image: product.images[0],
+      id: productToAdd._id,
+      name: productToAdd.name,
+      price: productToAdd.price,
+      quantity: qty,
+      image: productToAdd.images[0],
     });
-    setSelectedProduct(product);
+    setSelectedProduct(productToAdd);
     setIsModalOpen(true);
   };
 
@@ -164,7 +189,9 @@ export default function ProductDetailClient({ id }: { id: string }) {
                 <div className="flex items-center gap-2 mt-2">
                   <div className="flex items-center bg-blue-50 px-2 py-1 rounded">
                     <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                    <span className="ml-1 text-sm font-medium">4.8</span>
+                    <span className="ml-1 text-sm font-medium">
+                      {product.rating || 4.8}
+                    </span>
                     <span className="mx-1 text-gray-400">|</span>
                     <span className="text-sm text-gray-500">1,234 reviews</span>
                   </div>
@@ -235,7 +262,7 @@ export default function ProductDetailClient({ id }: { id: string }) {
 
                 <div className="mt-8 flex gap-4">
                   <Button
-                    onClick={handleAddToCart}
+                    onClick={() => handleAddToCart(product)}
                     className="bg-gradient-to-r from-blue-600 to-blue-800 hover:from-blue-700 hover:to-blue-900 flex-1 py-6 text-lg shadow-lg"
                   >
                     Add to Cart
@@ -269,6 +296,42 @@ export default function ProductDetailClient({ id }: { id: string }) {
                   <h3 className="font-medium mb-2">Specifications</h3>
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
+                      <p className="text-gray-500">Display</p>
+                      <p className="font-medium">
+                        {product.specifications?.display || "N/A"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-gray-500">Processor</p>
+                      <p className="font-medium">
+                        {product.specifications?.processor || "N/A"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-gray-500">RAM</p>
+                      <p className="font-medium">
+                        {product.specifications?.ram || "N/A"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-gray-500">Storage</p>
+                      <p className="font-medium">
+                        {product.specifications?.storage || "N/A"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-gray-500">Camera</p>
+                      <p className="font-medium">
+                        {product.specifications?.camera || "N/A"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-gray-500">Battery</p>
+                      <p className="font-medium">
+                        {product.specifications?.battery || "N/A"}
+                      </p>
+                    </div>
+                    <div>
                       <p className="text-gray-500">Brand</p>
                       <p className="font-medium">
                         {product.brand || "Generic"}
@@ -295,22 +358,72 @@ export default function ProductDetailClient({ id }: { id: string }) {
           </div>
 
           {/* Related Products Section */}
-          <div className="mt-16">
+          {/* <div className="mt-16">
             <h2 className="text-2xl font-bold mb-6">You may also like</h2>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {/* Placeholder for related products */}
-              {[1, 2, 3, 4].map((i) => (
-                <Card key={i} className="hover:shadow-md transition-shadow">
-                  <CardContent className="p-4">
-                    <Skeleton className="h-40 w-full mb-3" />
-                    <Skeleton className="h-5 w-3/4 mb-2" />
-                    <Skeleton className="h-4 w-1/2" />
-                  </CardContent>
-                </Card>
-              ))}
+              {relatedLoading
+                ? [1, 2, 3, 4].map((i) => (
+                    <Card key={i} className="hover:shadow-md transition-shadow">
+                      <CardContent className="p-4">
+                        <Skeleton className="h-40 w-full mb-3" />
+                        <Skeleton className="h-5 w-3/4 mb-2" />
+                        <Skeleton className="h-4 w-1/2" />
+                      </CardContent>
+                    </Card>
+                  ))
+                : relatedProducts.map((related) => (
+                    <Card
+                      key={related._id}
+                      className="hover:shadow-md transition-shadow"
+                    >
+                      <CardContent className="p-4">
+                        <div className="relative h-40 w-full mb-3">
+                          <Image
+                            src={related.images[0] || "/placeholder.jpg"}
+                            alt={related.name}
+                            fill
+                            className="object-contain"
+                          />
+                        </div>
+                        <h3 className="text-sm font-medium line-clamp-2 mb-2">
+                          {related.name}
+                        </h3>
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-base font-bold text-gray-900">
+                            {formatCurrency(
+                              related.discount > 0
+                                ? related.price * (1 - related.discount / 100)
+                                : related.price
+                            )}
+                          </span>
+                          {related.discount > 0 && (
+                            <span className="text-xs text-gray-500 line-through">
+                              {formatCurrency(related.price)}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1 mb-3">
+                          <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                          <span className="text-sm">
+                            {related.rating || 4.8}
+                          </span>
+                          <span className="text-xs text-gray-500">
+                            ({Math.floor(Math.random() * 1000) + 100} reviews)
+                          </span>
+                        </div>
+                        <Button
+                          onClick={() => handleAddToCart(related, 1)}
+                          className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                        >
+                          Add to Cart
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  ))}
             </div>
-          </div>
+          </div> */}
         </div>
+
         {/* Modal */}
         <Dialog.Root open={isModalOpen} onOpenChange={setIsModalOpen}>
           <Dialog.Portal>
@@ -341,7 +454,12 @@ export default function ProductDetailClient({ id }: { id: string }) {
                       {selectedProduct.name}
                     </h3>
                     <p className="text-sm text-gray-600">
-                      Tk.{selectedProduct.price.toFixed(2)}
+                      {formatCurrency(
+                        selectedProduct.discount > 0
+                          ? selectedProduct.price *
+                              (1 - selectedProduct.discount / 100)
+                          : selectedProduct.price
+                      )}
                     </p>
                   </div>
                 </div>

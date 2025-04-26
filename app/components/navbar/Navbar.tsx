@@ -27,7 +27,7 @@ export function Navbar() {
 
   // Gradient color effect
   const navbarGradient =
-    "bg-gradient-to-r from-purple-800 via-blue-800 to-red-800";
+    "bg-gradient-to-r from-slate-700 via-slate-800 to-blue-900";
 
   return (
     <nav className={`${navbarGradient} shadow-sm sticky top-0 z-50`}>
