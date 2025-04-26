@@ -356,7 +356,7 @@ export default function ProductsPage() {
                     transition={{ delay: idx * 0.1, duration: 0.5 }}
                   >
                     {/* Product Image */}
-                    <div className="relative group">
+                    <div className="relative group bg-transparent">
                       <Image
                         src={
                           product.images?.[0] || "/default-product-image.jpg"
@@ -364,7 +364,7 @@ export default function ProductsPage() {
                         alt={product.name}
                         width={300}
                         height={300}
-                        className="w-full h-56 object-cover transition-transform duration-500 group-hover:scale-110"
+                        className="w-full h-56 object-cover bg-transparent transition-transform duration-500 group-hover:scale-110"
                       />
                       {idx % 5 === 0 && (
                         <div className="absolute top-3 left-3 bg-red-600 text-xs font-bold text-white px-3 py-1 rounded-full shadow-md">
@@ -374,8 +374,6 @@ export default function ProductsPage() {
                       <div className="absolute top-3 right-3 bg-yellow-400 text-xs font-bold text-gray-900 px-3 py-1 rounded-full shadow-md">
                         Best Seller
                       </div>
-                      {/* Hover Overlay */}
-                      <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-opacity duration-300"></div>
                     </div>
 
                     {/* Product Details */}
