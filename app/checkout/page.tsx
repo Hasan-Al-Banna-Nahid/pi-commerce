@@ -13,14 +13,233 @@ import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import Image from "next/image";
 import { useCart } from "@/app/providers/shopping-cart";
+import {
+  Elements,
+  CardNumberElement,
+  CardExpiryElement,
+  CardCvcElement,
+  useStripe,
+  useElements,
+} from "@stripe/react-stripe-js";
 import { loadStripe } from "@stripe/stripe-js";
 import { Navbar } from "@/app/components/navbar/Navbar";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 import api from "@/app/lib/axios";
 import { Checkbox } from "@/components/ui/checkbox";
-import { StripeProvider, StripeForm } from "@/app/checkout/Stripe";
 
+// Initialize Stripe
+const stripePromise = loadStripe(
+  process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!
+);
+
+// Define TypeScript interfaces
+interface FormData {
+  name: string;
+  email: string;
+  phone: string;
+  street: string;
+  city: string;
+  state: string;
+  postalCode: string;
+  country: string;
+  billingSameAsShipping: boolean;
+  billingName: string;
+  billingStreet: string;
+  billingCity: string;
+  billingState: string;
+  billingPostalCode: string;
+  billingCountry: string;
+  useSavedCard: boolean;
+  total: number;
+}
+
+interface StripeFormProps {
+  clientSecret: string;
+  onPaymentSuccess: (paymentIntentId: string) => void;
+  onError: (error: Error) => void;
+  onCardChange: (event: any) => void;
+  formData: FormData;
+}
+
+// StripeForm Component
+function StripeForm({
+  clientSecret,
+  onPaymentSuccess,
+  onError,
+  onCardChange,
+  formData,
+}: StripeFormProps) {
+  const stripe = useStripe();
+  const elements = useElements();
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!stripe || !elements) {
+      onError(new Error("Stripe is not initialized. Please try again."));
+      return;
+    }
+
+    setIsProcessing(true);
+    const cardElement = elements.getElement(CardNumberElement);
+
+    try {
+      if (!cardElement) {
+        throw new Error("Card details are required");
+      }
+
+      const { error, paymentIntent } = await stripe.confirmCardPayment(
+        clientSecret,
+        {
+          payment_method: {
+            card: cardElement,
+            billing_details: {
+              name: formData.billingSameAsShipping
+                ? formData.name
+                : formData.billingName,
+              address: {
+                line1: formData.billingSameAsShipping
+                  ? formData.street
+                  : formData.billingStreet,
+                city: formData.billingSameAsShipping
+                  ? formData.city
+                  : formData.billingCity,
+                state: formData.billingSameAsShipping
+                  ? formData.state
+                  : formData.billingState,
+                postal_code: formData.billingSameAsShipping
+                  ? formData.postalCode
+                  : formData.billingPostalCode,
+                country: formData.billingSameAsShipping
+                  ? formData.country
+                  : formData.billingCountry,
+              },
+              phone: formData.phone,
+              email: formData.email,
+            },
+          },
+        }
+      );
+
+      if (error) {
+        throw new Error(error.message || "Payment failed");
+      }
+
+      if (paymentIntent.status === "succeeded") {
+        onPaymentSuccess(paymentIntent.id);
+      } else {
+        throw new Error(`Payment intent status: ${paymentIntent.status}`);
+      }
+    } catch (error: any) {
+      onError(error);
+      setIsProcessing(false);
+    }
+  };
+
+  if (!stripe || !elements) {
+    return (
+      <div className="p-4 bg-red-50 rounded-md">
+        <p className="text-sm text-red-800">
+          Error: Payment form could not be loaded. Please try again later.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <form className="space-y-4">
+      <div className="space-y-2">
+        <Label htmlFor="cardNumber">Card Number *</Label>
+        <CardNumberElement
+          id="cardNumber"
+          options={{
+            style: {
+              base: {
+                fontSize: "16px",
+                color: "#424770",
+                "::placeholder": { color: "#aab7c4" },
+              },
+              invalid: { color: "#9e2146" },
+            },
+          }}
+          onChange={onCardChange}
+          className="p-2 border rounded-md"
+        />
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="cardExpiry">Expiry Date *</Label>
+          <CardExpiryElement
+            id="cardExpiry"
+            options={{
+              style: {
+                base: {
+                  fontSize: "16px",
+                  color: "#424770",
+                  "::placeholder": { color: "#aab7c4" },
+                },
+                invalid: { color: "#9e2146" },
+              },
+            }}
+            onChange={onCardChange}
+            className="p-2 border rounded-md"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="cardCvc">CVC *</Label>
+          <CardCvcElement
+            id="cardCvc"
+            options={{
+              style: {
+                base: {
+                  fontSize: "16px",
+                  color: "#424770",
+                  "::placeholder": { color: "#aab7c4" },
+                },
+                invalid: { color: "#9e2146" },
+              },
+            }}
+            onChange={onCardChange}
+            className="p-2 border rounded-md"
+          />
+        </div>
+      </div>
+      <Button
+        type="submit"
+        onClick={handleSubmit}
+        className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg"
+        disabled={!stripe || isProcessing}
+      >
+        {isProcessing ? (
+          <>
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            Processing...
+          </>
+        ) : (
+          `Pay ${formData.total.toFixed(2)}৳`
+        )}
+      </Button>
+    </form>
+  );
+}
+
+// StripeProvider Component
+function StripeProvider({
+  clientSecret,
+  children,
+}: {
+  clientSecret: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Elements stripe={stripePromise} options={{ clientSecret }}>
+      {children}
+    </Elements>
+  );
+}
+
+// Main CheckoutPage Component
 export default function CheckoutPage() {
   const { cartItems, cartCount, clearCart, updateQuantity, removeFromCart } =
     useCart();
@@ -36,7 +255,6 @@ export default function CheckoutPage() {
   const [cardDetailsProvided, setCardDetailsProvided] = useState(false);
   const router = useRouter();
 
-  // Debug logs for authentication and cart state
   console.log("CheckoutPage State:", {
     authLoading,
     isAuthenticated,
@@ -71,7 +289,7 @@ export default function CheckoutPage() {
     });
   }, [cartItems]);
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<FormData>({
     name: user?.name || "",
     email: user?.email || "",
     phone: "",
@@ -88,6 +306,7 @@ export default function CheckoutPage() {
     billingPostalCode: "",
     billingCountry: "bd",
     useSavedCard: false,
+    total: 0,
   });
 
   const shippingCost = formData.city === "Dhaka" ? 60 : 100;
@@ -107,6 +326,11 @@ export default function CheckoutPage() {
 
   const taxAmount = calculateTaxes(subtotal);
   const total = subtotal + shippingCost + taxAmount;
+
+  // Update formData.total whenever total changes
+  useEffect(() => {
+    setFormData((prev) => ({ ...prev, total }));
+  }, [total]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -181,7 +405,7 @@ export default function CheckoutPage() {
     ];
 
     for (const field of requiredFields) {
-      if (!formData[field as keyof typeof formData]) {
+      if (!formData[field as keyof FormData]) {
         toast.error(`Please fill in ${field}`);
         return false;
       }
@@ -197,7 +421,7 @@ export default function CheckoutPage() {
       ];
 
       for (const field of billingFields) {
-        if (!formData[field as keyof typeof formData]) {
+        if (!formData[field as keyof FormData]) {
           toast.error(`Please fill in billing ${field.replace("billing", "")}`);
           return false;
         }
@@ -280,7 +504,57 @@ export default function CheckoutPage() {
     }
   };
 
-  // In handleStripePayment
+  const handleSslcommerzPayment = async (paymentMethodType: string) => {
+    try {
+      const response = await api.post("/api/orders/sslcommerz/initiate", {
+        items: cartItems.map((item) => ({
+          id: item.id,
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price,
+        })),
+        shippingAddress: {
+          name: formData.name,
+          street: formData.street,
+          city: formData.city,
+          state: formData.state,
+          postalCode: formData.postalCode,
+          country: formData.country,
+          phone: formData.phone,
+        },
+        billingAddress: formData.billingSameAsShipping
+          ? undefined
+          : {
+              name: formData.billingName,
+              street: formData.billingStreet,
+              city: formData.billingCity,
+              state: formData.billingState,
+              postalCode: formData.billingPostalCode,
+              country: formData.billingCountry,
+              phone: formData.phone,
+            },
+        shippingCost,
+        taxAmount,
+        subtotal,
+        total,
+        paymentMethodType,
+      });
+
+      if (response.data.success && response.data.gatewayUrl) {
+        window.location.href = response.data.gatewayUrl;
+      } else {
+        throw new Error(
+          response.data.message || "Failed to initiate SSLCommerz payment"
+        );
+      }
+    } catch (error: any) {
+      toast.error("Payment initiation failed", {
+        description: error.response?.data?.message || error.message,
+      });
+      setIsProcessing(false);
+    }
+  };
+
   const handleStripePayment = async () => {
     try {
       const response = await handlePaymentIntentCreation();
@@ -305,7 +579,6 @@ export default function CheckoutPage() {
     }
   };
 
-  // In handlePaymentSuccess (called after Stripe payment confirmation)
   const handlePaymentSuccess = async (paymentIntentId: string) => {
     try {
       const orderResponse = await api.post("/api/orders", {
@@ -315,7 +588,6 @@ export default function CheckoutPage() {
           name: item.name,
           quantity: item.quantity,
           price: item.price,
-          // variant: item.variant || null, // Include variant if supported
         })),
         shippingAddress: {
           name: formData.name,
@@ -349,11 +621,10 @@ export default function CheckoutPage() {
         taxAmount,
         subtotal,
         total,
-        paymentMethod: "credit", // Explicitly set
+        paymentMethod: "credit",
       });
 
       if (orderResponse.data.success) {
-        // await saveUserInfo();
         toast.success("Order placed successfully!", {
           description: "Your order has been confirmed.",
         });
@@ -367,12 +638,10 @@ export default function CheckoutPage() {
       toast.error("Order creation failed", {
         description: error.response?.data?.message || error.message,
       });
-    } finally {
       setIsProcessing(false);
     }
   };
 
-  // In handleCodPayment
   const handleCodPayment = async () => {
     try {
       const orderResponse = await api.post("/api/orders/cod", {
@@ -381,7 +650,6 @@ export default function CheckoutPage() {
           name: item.name,
           quantity: item.quantity,
           price: item.price,
-          // variant: item.variant || null, // Include variant if supported
         })),
         shippingAddress: {
           name: formData.name,
@@ -415,11 +683,10 @@ export default function CheckoutPage() {
         taxAmount,
         subtotal,
         total,
-        paymentMethod: "cod", // Explicitly include
+        paymentMethod: "cod",
       });
 
       if (orderResponse.data.success) {
-        // await saveUserInfo();
         toast.success("Order placed successfully!", {
           description: "Your COD order has been confirmed.",
         });
@@ -433,7 +700,6 @@ export default function CheckoutPage() {
       toast.error("COD order failed", {
         description: error.response?.data?.message || error.message,
       });
-    } finally {
       setIsProcessing(false);
     }
   };
@@ -447,8 +713,15 @@ export default function CheckoutPage() {
     try {
       if (paymentMethod === "credit") {
         await handleStripePayment();
-      } else {
+      } else if (paymentMethod === "cod") {
         await handleCodPayment();
+      } else {
+        const sslMethodMap: { [key: string]: string } = {
+          sslcommerz_card: "ssl_card",
+          bkash: "bkash",
+          nagad: "nagad",
+        };
+        await handleSslcommerzPayment(sslMethodMap[paymentMethod]);
       }
     } catch (error: any) {
       toast.error(
@@ -462,7 +735,7 @@ export default function CheckoutPage() {
   useEffect(() => {
     const fetchSavedPaymentMethods = async () => {
       try {
-        setSavedPaymentMethodId("pm_123456789");
+        setSavedPaymentMethodId("pm_123456789"); // Mocked for now
       } catch (error) {
         console.error("Failed to fetch saved payment methods:", error);
       }
@@ -481,7 +754,7 @@ export default function CheckoutPage() {
           "Payment initialization is taking too long. Please try again."
         );
         setIsFetchingPaymentIntent(false);
-      }, 10000); // 10-second timeout
+      }, 10000);
 
       const response = await handlePaymentIntentCreation();
       clearTimeout(timeout);
@@ -516,12 +789,16 @@ export default function CheckoutPage() {
     }
   }, [paymentMethod, formData.useSavedCard, isAuthenticated, cartItems]);
 
-  const handleCardDetailsChange = (event: any) => {
-    console.log("Card Details Change:", event);
-    setCardDetailsProvided(event.complete);
+  const handleCardDetailsChange = (element: any) => {
+    setCardDetailsProvided(element.complete);
   };
 
-  // Render loading state
+  // Debug cartItems and hasInvalidQuantity
+  useEffect(() => {
+    console.log("Cart Items:", cartItems);
+    console.log("Has Invalid Quantity:", hasInvalidQuantity);
+  }, [cartItems, hasInvalidQuantity]);
+
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -531,7 +808,6 @@ export default function CheckoutPage() {
     );
   }
 
-  // Render fallback for unauthenticated users
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -548,7 +824,6 @@ export default function CheckoutPage() {
     );
   }
 
-  // Render empty cart state
   if (cartCount === 0) {
     return (
       <div className="max-w-2xl mx-auto py-16 px-4 text-center">
@@ -563,15 +838,12 @@ export default function CheckoutPage() {
     );
   }
 
-  // Main checkout UI
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
       <Navbar />
-
       <div className="absolute inset-0 -z-10 opacity-10 overflow-hidden">
         <div className="absolute inset-0 bg-[url('/images/pattern.jpg')] bg-repeat [mask-image:radial-gradient(ellipse_at_center,white,transparent_70%)]"></div>
       </div>
-
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <motion.h1
           initial={{ opacity: 0, y: -20 }}
@@ -633,7 +905,6 @@ export default function CheckoutPage() {
                       />
                     </div>
                   </div>
-
                   <div className="space-y-2">
                     <Label htmlFor="phone">Phone Number *</Label>
                     <Input
@@ -645,7 +916,6 @@ export default function CheckoutPage() {
                       required
                     />
                   </div>
-
                   <div className="space-y-2">
                     <Label htmlFor="street">Street Address *</Label>
                     <Input
@@ -656,7 +926,6 @@ export default function CheckoutPage() {
                       required
                     />
                   </div>
-
                   <div className="grid grid-cols-3 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="city">City *</Label>
@@ -699,7 +968,6 @@ export default function CheckoutPage() {
                       />
                     </div>
                   </div>
-
                   <div className="space-y-2">
                     <Label htmlFor="country">Country</Label>
                     <Input
@@ -710,7 +978,6 @@ export default function CheckoutPage() {
                       disabled
                     />
                   </div>
-
                   <div className="pt-4">
                     <div className="flex items-center space-x-2">
                       <Checkbox
@@ -727,7 +994,6 @@ export default function CheckoutPage() {
                         Billing address same as shipping
                       </Label>
                     </div>
-
                     {!formData.billingSameAsShipping && (
                       <div className="mt-4 space-y-4">
                         <h4 className="font-medium">Billing Address</h4>
@@ -812,7 +1078,58 @@ export default function CheckoutPage() {
                         className="flex items-center gap-2"
                       >
                         <CreditCard className="h-5 w-5" />
-                        Credit/Debit Card
+                        Credit/Debit Card (Stripe)
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <RadioGroupItem
+                        value="sslcommerz_card"
+                        id="sslcommerz_card"
+                      />
+                      <Label
+                        htmlFor="sslcommerz_card"
+                        className="flex items-center gap-2"
+                      >
+                        <Image
+                          src="/images/ssl.png"
+                          alt="Credit/Debit Card (SSLCommerz)"
+                          width={20}
+                          height={20}
+                          className="h-5 w-auto"
+                        />
+                        Credit/Debit Card (SSLCommerz)
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <RadioGroupItem value="bkash" id="bkash" />
+                      <Label
+                        htmlFor="bkash"
+                        className="flex items-center gap-2"
+                      >
+                        <Image
+                          src="/images/bkash.png"
+                          alt="bKash"
+                          width={20}
+                          height={20}
+                          className="h-5 w-auto"
+                        />
+                        bKash
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <RadioGroupItem value="nagad" id="nagad" />
+                      <Label
+                        htmlFor="nagad"
+                        className="flex items-center gap-2"
+                      >
+                        <Image
+                          src="/images/nagad.png"
+                          alt="Nagad"
+                          width={20}
+                          height={20}
+                          className="h-5 w-auto"
+                        />
+                        Nagad
                       </Label>
                     </div>
                     <div className="flex items-center space-x-3">
@@ -852,7 +1169,7 @@ export default function CheckoutPage() {
                         </div>
                       )}
 
-                      {paymentMethod === "credit" && !formData.useSavedCard ? (
+                      {!formData.useSavedCard ? (
                         isFetchingPaymentIntent ? (
                           <div className="p-4 bg-gray-100 rounded-md flex items-center justify-center">
                             <Loader2 className="h-5 w-5 animate-spin mr-2" />
@@ -872,6 +1189,7 @@ export default function CheckoutPage() {
                                 setIsProcessing(false);
                               }}
                               onCardChange={handleCardDetailsChange}
+                              formData={formData}
                             />
                             {!cardDetailsProvided && (
                               <p className="text-sm text-red-600 mt-2">
@@ -896,6 +1214,7 @@ export default function CheckoutPage() {
                       ) : (
                         <Button
                           type="submit"
+                          onClick={handleSubmit}
                           className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg"
                           disabled={
                             isProcessing ||
@@ -914,6 +1233,29 @@ export default function CheckoutPage() {
                         </Button>
                       )}
                     </div>
+                  )}
+
+                  {(paymentMethod === "sslcommerz_card" ||
+                    paymentMethod === "bkash" ||
+                    paymentMethod === "nagad") && (
+                    <Button
+                      type="submit"
+                      className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg"
+                      disabled={
+                        isProcessing ||
+                        hasInvalidQuantity ||
+                        isFetchingPaymentIntent
+                      }
+                    >
+                      {isProcessing ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Processing...
+                        </>
+                      ) : (
+                        `Proceed to Pay ${total.toFixed(2)}৳`
+                      )}
+                    </Button>
                   )}
 
                   {paymentMethod === "cod" && (
@@ -1031,7 +1373,6 @@ export default function CheckoutPage() {
                     </motion.div>
                   ))}
                 </div>
-
                 <div className="space-y-3">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Subtotal</span>
@@ -1051,7 +1392,6 @@ export default function CheckoutPage() {
                     <span className="text-muted-foreground">Taxes & Fees</span>
                     <span>{taxAmount.toFixed(2)}৳</span>
                   </div>
-
                   <div className="flex justify-between pt-3 border-t font-medium text-lg">
                     <span>Total</span>
                     <span>{total.toFixed(2)}৳</span>
