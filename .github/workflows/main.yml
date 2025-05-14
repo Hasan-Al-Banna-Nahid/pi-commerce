@@ -1,0 +1,11 @@
+name: pi-commerce-client
+on:
+  push:
+    branches: [main]
+
+jobs:
+  v1:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to production
+        run: echo "Deploying to production..."
