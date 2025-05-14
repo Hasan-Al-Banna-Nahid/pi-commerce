@@ -1081,7 +1081,7 @@ export default function CheckoutPage() {
                         Credit/Debit Card (Stripe)
                       </Label>
                     </div>
-                    <div className="flex items-center space-x-3">
+                    {/* <div className="flex items-center space-x-3">
                       <RadioGroupItem
                         value="sslcommerz_card"
                         id="sslcommerz_card"
@@ -1131,7 +1131,7 @@ export default function CheckoutPage() {
                         />
                         Nagad
                       </Label>
-                    </div>
+                    </div> */}
                     <div className="flex items-center space-x-3">
                       <RadioGroupItem value="cod" id="cod" />
                       <Label htmlFor="cod" className="flex items-center gap-2">
