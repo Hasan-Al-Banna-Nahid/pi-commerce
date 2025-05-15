@@ -1,0 +1,40 @@
+name: Merge Branches into Development Nightly
+
+on:
+  schedule:
+    - cron: "1 0 * * *"
+
+jobs:
+  merge-branches:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout development
+        uses: actions/checkout@v4
+        with:
+          ref: development
+          fetch-depth: 0
+
+      - name: Set up Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Fetch all branches
+        run: |
+          git fetch --all
+
+      - name: Merge non-development branches into development
+        run: |
+          branches=$(git branch -r | grep -vE 'origin/(HEAD|main|development)$' | sed 's/origin\///')
+          for branch in $branches; do
+            echo "Attempting to merge $branch into development..."
+            git checkout development
+            if git merge --no-ff origin/$branch -m "Auto-merged $branch into development"; then
+              echo "Merged $branch successfully"
+            else
+              echo "Merge conflict with $branch, skipping..."
+              git merge --abort
+            fi
+          done
+          git push origin development
