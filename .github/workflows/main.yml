@@ -1,0 +1,37 @@
+name: Auto Merge Development to Main
+
+on:
+  push:
+    branches:
+      - development
+
+permissions:
+  contents: write
+
+jobs:
+  merge-to-main:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Fetch all branches
+        run: git fetch origin
+
+      - name: Checkout and merge into main
+        run: |
+          git checkout -B main origin/main
+          git merge --no-ff origin/development || echo "Merge conflict detected"
+
+      - name: Push to main if no conflicts
+        if: success()
+        run: |
+          git push https://x-access-token:${{ secrets.PAT_TOKEN }}@github.com/${{ github.repository }} main
