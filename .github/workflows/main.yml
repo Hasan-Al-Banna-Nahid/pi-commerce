@@ -1,11 +1,36 @@
-name: pi-commerce-client
+name: Auto Merge Development to Main
+
 on:
   push:
-    branches: [main]
+    branches:
+      - development
 
 jobs:
-  v1:
+  merge-to-main:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Deploy to production
-        run: echo "Deploying to production..."
+      - name: Checkout development branch
+        uses: actions/checkout@v4
+        with:
+          ref: development
+          fetch-depth: 0
+
+      - name: Set up Git user
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Fetch main branch
+        run: |
+          git fetch origin main
+
+      - name: Attempt merge development into main
+        run: |
+          git checkout main
+          git merge --no-ff origin/development || echo "Merge conflict detected"
+
+      - name: Push to main if no conflicts
+        if: success()
+        run: |
+          git push origin main
