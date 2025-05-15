@@ -1,0 +1,31 @@
+name: Auto Merge to Development
+
+on:
+  push:
+    branches-ignore:
+      - development # Ignore pushes to the development branch
+
+jobs:
+  merge-to-development:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout target branch
+        uses: actions/checkout@v3
+
+      - name: Set up Git
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+
+      - name: Fetch all branches
+        run: git fetch --all
+
+      - name: Attempt to merge into development
+        run: |
+          git checkout development
+          git merge origin/${{ github.ref_name }} --no-edit || echo "Merge conflict, skipping..."
+
+      - name: Push if merge succeeded
+        if: success()
+        run: |
+          git push origin development
